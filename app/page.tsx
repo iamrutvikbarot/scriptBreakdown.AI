@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { useToast } from './components/ToastProvider';
 
 // Define the interface locally to match the API response
 interface ScriptData {
@@ -39,6 +40,7 @@ interface ScriptData {
 }
 
 export default function Home() {
+  const { showToast } = useToast();
   const [input, setInput] = useState('');
   const [result, setResult] = useState<ScriptData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,23 +50,55 @@ export default function Home() {
   const [inputMode, setInputMode] = useState<'text' | 'url'>('text');
   const [docUrl, setDocUrl] = useState('');
 
-  const handleAnalyze = async () => {
-    setLoading(true);
-    setResult(null); 
-    
-    // We'll initialize an empty result structure to append to
-    const emptyResult: ScriptData = { scenes: [] };
-    setResult(emptyResult);
-
+  const triggerAutoAnnotation = async (docId: string, data: ScriptData) => {
     try {
-      const payload = inputMode === 'text' 
-        ? { text: input } 
-        : { fileUrl: docUrl };
+      console.log("Triggering auto-annotation for doc:", docId);
+      const res = await fetch('/api/annotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docId, scriptData: data }),
+      });
+      if (res.ok) {
+        console.log("Auto-annotation successful");
+        showToast("Auto-annotation successful!", "success");
+      } else {
+        console.error("Auto-annotation failed");
+        showToast("Auto-annotation failed.", "error");
+      }
+    } catch (err) {
+      console.error("Auto-annotation error", err);
+    }
+  };
 
+  const handleAnalyze = async () => {
+    if (!input && !docUrl) return;
+    setLoading(true);
+    setResult(null);
+
+    // Determine input and provider based on mode
+    // Current Document ID (if relevant)
+    let currentDocUrl = "";
+    
+    // Prepare payload
+    const payload: any = {
+      provider: 'nvidia',
+      stream: true
+    };
+
+    if (inputMode === 'url') {
+      currentDocUrl = docUrl;
+      payload.fileUrl = docUrl;
+    } else {
+      payload.text = input;
+    }
+
+    try { 
+      // No need to pre-extract; the API handles it
+      
       const res = await fetch('/api/analyze', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!res.ok) {
@@ -78,6 +112,9 @@ export default function Home() {
       const decoder = new TextDecoder();
       let done = false;
       let partialLine = "";
+      
+      // Initialize results accumulator for auto-annotation
+      const accumulatedScenes: any[] = [];
 
       while (!done) {
         const { value, done: isDone } = await reader.read();
@@ -100,6 +137,9 @@ export default function Home() {
                      scenes: [...prev.scenes, newScene].sort((a,b) => a.scene_number - b.scene_number) 
                    };
                  });
+                 accumulatedScenes.push(newScene);
+                 // Update state with sorted scenes for immediate UI display
+                 setResult({ scenes: [...accumulatedScenes].sort((a,b) => a.scene_number - b.scene_number) });
                } catch (e) {
                  console.error("Failed to parse chunk:", line, e);
                }
@@ -108,8 +148,18 @@ export default function Home() {
         }
       }
 
+      // After streaming is complete, trigger auto-annotation if applicable
+      if (inputMode === 'url' && currentDocUrl && accumulatedScenes.length > 0) {
+        const docIdMatch = currentDocUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (docIdMatch && docIdMatch[1]) {
+          triggerAutoAnnotation(docIdMatch[1], { scenes: accumulatedScenes });
+        } else {
+          console.warn("Could not extract docId from URL for auto-annotation.");
+        }
+      }
+
     } catch (e) {
-      alert("Error processing script: " + e);
+      showToast("Error processing script: " + e, "error");
     }
     setLoading(false);
   };
@@ -191,10 +241,24 @@ export default function Home() {
                       value={docUrl}
                       onChange={(e) => setDocUrl(e.target.value)}
                     />
-                    <p className="text-[10px] md:text-xs text-gray-500 ml-1 flex items-center gap-2">
-                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
-                       Public or Shared with Service Account
-                    </p>
+                    <div className="flex flex-col gap-2 mt-2 ml-1">
+                      <p className="text-[10px] md:text-xs text-gray-500 flex items-center gap-2">
+                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
+                         Must be shared with Service Account (Editor Mode):
+                      </p>
+                      <div className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
+                           onClick={() => {
+                             navigator.clipboard.writeText("breakdown-ai@brack-down-ai.iam.gserviceaccount.com");
+                             showToast("Email copied to clipboard!", "success");
+                           }}
+                           title="Click to copy"
+                      >
+                        <code className="text-xs text-emerald-400 font-mono break-all">
+                          breakdown-ai@brack-down-ai.iam.gserviceaccount.com
+                        </code>
+                        <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -238,9 +302,13 @@ export default function Home() {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6 mb-8 md:mb-12 px-2 md:px-0">
               <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">ANALYSIS RESULTS</h2>
               <div className="h-px bg-gradient-to-r from-gray-800 to-transparent flex-grow w-full md:w-auto"></div>
-              <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md self-start md:self-auto">
-                {result.scenes?.length || 0} SCENES EXTRACTED
-              </span>
+              
+              <div className="flex items-center gap-4 self-start md:self-auto">
+                {/* Auto-Sync is now active, no button needed */}
+                <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md">
+                  {result.scenes?.length || 0} SCENES EXTRACTED
+                </span>
+              </div>
             </div>
             
             <div className="grid gap-6 md:gap-8">

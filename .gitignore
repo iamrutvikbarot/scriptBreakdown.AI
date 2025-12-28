@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# google doc
+brack-down-ai-c6c5eb7f9c48.json
+
