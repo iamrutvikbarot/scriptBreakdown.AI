@@ -8,8 +8,8 @@ export function splitScriptIntoScenes(fullText: string): string[] {
     // followed by typical location/time info.
     // We utilize a lookahead or just standard split.
 
-    // A robust regex for modern screenplays
-    const sceneHeaderRegex = /^\s*((?:INT|EXT|I\/E|INT\/EXT)\..+?)$/gm;
+    // A robust regex for modern screenplays (allows optional dot)
+    const sceneHeaderRegex = /^\s*((?:INT|EXT|I\/E|INT\/EXT)[.\s]\s*.+?)$/gm;
 
     // We can't just use split because we want to keep the headers attached to the content.
     // So we will match all headers, find their indices, and slice.

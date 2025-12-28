@@ -148,6 +148,11 @@ export default function Home() {
         }
       }
 
+      // Check for empty results
+      if (accumulatedScenes.length === 0) {
+        showToast("Analysis complete, but no scenes were found.", "error");
+      }
+
       // After streaming is complete, trigger auto-annotation if applicable
       if (inputMode === 'url' && currentDocUrl && accumulatedScenes.length > 0) {
         const docIdMatch = currentDocUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
