@@ -1,44 +1,15 @@
 // src/lib/google-docs.ts
 import { google } from 'googleapis';
 
-// Initialize Auth (Assumes you have env vars or a key file)
-import path from 'path';
-
-const KEY_FILE_NAME = 'brack-down-ai-c6c5eb7f9c48.json';
-const keyFilePath = path.join(process.cwd(), KEY_FILE_NAME);
-
-let authConfig: any = {
-  scopes: [
-    'https://www.googleapis.com/auth/drive',
-    'https://www.googleapis.com/auth/documents'
-  ],
-};
-
-// Prefer Key File if it exists (Easier for local dev)
-try {
-  // We can just pass keyFile to GoogleAuth, it handles existence check errors by throwing? 
-  // Better to check existence or just let it try?
-  // Actually, GoogleAuth takes `keyFile` property.
-  // Let's use logic:
-  authConfig.keyFile = keyFilePath;
-} catch (e) {
-  // If no file, fallback to credentials
-  authConfig.credentials = {
+const auth = new google.auth.GoogleAuth({
+  credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
     private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  };
-}
-
-// Just initialize. If keyFile is missing/invalid, it might fail, so let's stick to the env var fallback logic MORE EXPLICITLY.
-// Actually, safely we can just:
-const auth = new google.auth.GoogleAuth({
-  ...authConfig,
-  // If keyFile is provided it uses it. If not, it looks for GOOGLE_APPLICATION_CREDENTIALS.
-  // If we want explicit fallback:
-  keyFile: keyFilePath,
-  // Note: If the file doesn't exist, this might throw. 
-  // Let's rely on standard practice or simple check? 
-  // Since I know the file is there (found via tool), I will hardcode it for this user session as requested by their actions.
+  },
+  scopes: [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/documents',
+  ],
 });
 
 // To be safe for others or deployment, we should check fs.
