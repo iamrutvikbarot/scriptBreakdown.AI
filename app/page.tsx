@@ -1,8 +1,9 @@
 "use client";
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useToast } from './components/ToastProvider';
 
-// Define the interface locally to match the API response
 interface ScriptData {
   scenes: {
     scene_number: number;
@@ -39,6 +40,77 @@ interface ScriptData {
   }[];
 }
 
+const README_CONTENT = `# SCRIPTBREAKDOWN.AI - User Guide & Integration Guide
+
+Welcome to **ScriptBreakdown.AI**, the professional-grade tool for transforming your raw screenplays into structured, production-ready data.
+
+## 🚀 How to Use the Service
+
+### 1. Prepare your Google Doc
+Our service integrates directly with Google Docs for automated analysis and annotation. 
+- **Share Permission**: You must share your Google Doc with our service account email:
+  \`breakdown-ai@brack-down-ai.iam.gserviceaccount.com\`
+- **Access Level**: Set the permission to **Editor**. This allows the AI to highlight entities directly in your script.
+
+### 2. Character Definition Pattern (IMPORTANT)
+For the most accurate cast extraction, our AI uses an embedded pattern detection. In your action paragraphs, introduce characters using the following format:
+\`NAME (Sex) (Age) (Build) (Wardrobe)\`
+
+**Example:**
+> *INT. - AIRPLANE - DAY*
+> 
+> **APRIL (F) (30s) (Kind and smart) (Nice clothes)** sits next to **PAUL (M) (30s) (Big, strong, toxic) (Casual clothes)**. PAUL is aggressive and takes up space.
+
+### 3. Run the Breakdown
+- Copy your Google Doc URL.
+- Paste it into the input field on the **ScriptBreakdown.AI** home page.
+- Click **"BREAK IT DOWN"**.
+- Watch the progress bar as the AI processes each scene in real-time.
+
+### 4. Review Results
+- **In-App**: View the structured breakdown including summaries, cast details, props, vehicles, and effects (SFX/VFX).
+- **In-Doc**: Return to your Google Doc to see automated color-coded highlights of all extracted entities.
+
+---
+
+## 🎨 Color Coding Legend
+The service automatically highlights your script using the following color scheme:
+
+| Category | Color | Description |
+| :--- | :--- | :--- |
+| **Scene Header** | Cream (#fff2cc) | INT/EXT and Scene Numbers |
+| **Location** | Light Blue (#c9daf8) | Script Story Locations |
+| **Cast/Actors** | Bright Green (#00ff00) | Speaking Characters |
+| **Non-Speaking** | Soft Green (#b6d7a8) | Background/Atmosphere characters |
+| **Props** | Yellow (#ffff00) | Handheld or interacted objects |
+| **Wardrobe** | Pink (#ead1dc) | Clothing and accessories |
+| **Vehicles** | Blue (#4a86e8) | Cars, planes, boats, etc. |
+| **SFX** | Light Cyan (#cfe2f3) | Practical sound effects |
+| **VFX** | Cyan (#00ffff) | Visual effects requirements |
+
+---
+
+## 📧 Email Template for Users
+
+**Subject: Unleash the Power of Your Script with ScriptBreakdown.AI!**
+
+Hi [User Name],
+
+We're excited to have you on board with ScriptBreakdown.AI! Transforming your screenplay into a production-ready breakdown has never been easier.
+
+To get started, follow these simple steps:
+
+1. **Grant Access**: Share your Google Doc with \`breakdown-ai@brack-down-ai.iam.gserviceaccount.com\` as an **Editor**.
+2. **Format Characters**: Use our smart pattern \`NAME (Sex) (Age) (Build) (Wardrobe)\` when introducing characters in your script for perfect extraction.
+3. **Analyze**: Paste your URL at [Your-App-URL] and click "Break It Down".
+
+In seconds, you'll have a full scene-by-scene breakdown and a beautifully annotated Google Doc waiting for you.
+
+Happy producing!
+
+Best regards,
+The ScriptBreakdown.AI Team`;
+
 export default function Home() {
   const { showToast } = useToast();
   const [result, setResult] = useState<ScriptData | null>(null);
@@ -50,6 +122,7 @@ export default function Home() {
   
   // Progress State
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const triggerAutoAnnotation = async (docId: string, data: ScriptData) => {
     try {
@@ -180,6 +253,31 @@ export default function Home() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-20 flex-grow w-full">
+        
+        {/* Navigation Links - Top Right */}
+        <div className="absolute top-6 right-6 flex items-center gap-4 z-50">
+          <button 
+            onClick={() => setIsGuideOpen(true)}
+            className="glass-panel px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all group shadow-xl text-xs font-bold tracking-wider cursor-pointer"
+          >
+            <span className="text-gray-400 group-hover:text-emerald-400">USER GUIDE</span>
+            <svg className="w-4 h-4 text-gray-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </button>
+
+          <a 
+            href="https://github.com/iamrutvikbarot/scriptBreakdown.AI" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="glass-panel p-2.5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all group shadow-xl"
+            title="View on GitHub"
+          >
+            <svg className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            </svg>
+          </a>
+        </div>
         
         {/* Header Section */}
         <header className="mb-10 md:mb-16 text-center space-y-4 md:space-y-6 relative">
@@ -511,6 +609,68 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* User Guide Modal */}
+      {isGuideOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setIsGuideOpen(false)}
+          ></div>
+          
+          {/* Modal Container */}
+          <div className="relative w-full max-w-4xl max-h-[90vh] glass-panel rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
+            {/* Modal Header */}
+            <div className="bg-black/40 px-6 py-4 border-b border-white/5 flex items-center justify-between">
+              <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
+                <span className="text-emerald-500">📖</span> USER MANUAL
+              </h2>
+              <button 
+                onClick={() => setIsGuideOpen(false)}
+                className="p-2 hover:bg-white/5 rounded-full transition-colors group cursor-pointer"
+              >
+                <svg className="w-6 h-6 text-gray-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar">
+              <div className="prose prose-invert prose-emerald max-w-none 
+                prose-headings:font-black prose-headings:tracking-tight prose-headings:uppercase 
+                prose-h1:text-3xl prose-h1:mb-8 prose-h1:text-transparent prose-h1:bg-clip-text prose-h1:bg-gradient-to-r prose-h1:from-emerald-400 prose-h1:to-teal-200
+                prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:border-b prose-h2:border-white/5 prose-h2:pb-2
+                prose-h3:text-lg prose-h3:text-emerald-400 prose-h3:mt-8
+                prose-p:text-gray-400 prose-p:leading-relaxed
+                prose-li:text-gray-400
+                prose-strong:text-white
+                prose-code:text-emerald-400 prose-code:bg-emerald-500/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+                prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/5 prose-pre:rounded-xl
+                prose-blockquote:border-l-emerald-500 prose-blockquote:bg-emerald-500/5 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-xl prose-blockquote:italic prose-blockquote:text-gray-300
+                prose-table:border prose-table:border-white/5 prose-table:rounded-xl prose-table:overflow-hidden
+                prose-th:bg-white/5 prose-th:px-4 prose-th:py-3 prose-th:text-xs prose-th:font-bold prose-th:text-gray-500 prose-th:uppercase prose-th:tracking-wider
+                prose-td:px-4 prose-td:py-3 prose-td:border-t prose-td:border-white/5 prose-td:text-sm
+              ">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {README_CONTENT}
+                </ReactMarkdown>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="bg-black/40 px-6 py-4 border-t border-white/5 text-center">
+              <button 
+                onClick={() => setIsGuideOpen(false)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-2 rounded-xl font-bold transition-all cursor-pointer"
+              >
+                GOT IT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SCRIPTBREAKDOWN.AI - User Guide & Integration Guide
 
-## Getting Started
+Welcome to **ScriptBreakdown.AI**, the professional-grade tool for transforming your raw screenplays into structured, production-ready data.
 
-First, run the development server:
+## 🚀 How to Use the Service
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### 1. Prepare your Google Doc
+Our service integrates directly with Google Docs for automated analysis and annotation. 
+- **Share Permission**: You must share your Google Doc with our service account email:
+  `breakdown-ai@brack-down-ai.iam.gserviceaccount.com`
+- **Access Level**: Set the permission to **Editor**. This allows the AI to highlight entities directly in your script.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Character Definition Pattern (IMPORTANT)
+For the most accurate cast extraction, our AI uses an embedded pattern detection. In your action paragraphs, introduce characters using the following format:
+`NAME (Sex) (Age) (Build) (Wardrobe)`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Example:**
+> *INT. - AIRPLANE - DAY*
+> 
+> **APRIL (F) (30s) (Kind and smart) (Nice clothes)** sits next to **PAUL (M) (30s) (Big, strong, toxic) (Casual clothes)**. PAUL is aggressive and takes up space.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Run the Breakdown
+- Copy your Google Doc URL.
+- Paste it into the input field on the **ScriptBreakdown.AI** home page.
+- Click **"BREAK IT DOWN"**.
+- Watch the progress bar as the AI processes each scene in real-time.
 
-## Learn More
+### 4. Review Results
+- **In-App**: View the structured breakdown including summaries, cast details, props, vehicles, and effects (SFX/VFX).
+- **In-Doc**: Return to your Google Doc to see automated color-coded highlights of all extracted entities.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🎨 Color Coding Legend
+The service automatically highlights your script using the following color scheme:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Category | Color | Description |
+| :--- | :--- | :--- |
+| **Scene Header** | Cream (#fff2cc) | INT/EXT and Scene Numbers |
+| **Location** | Light Blue (#c9daf8) | Script Story Locations |
+| **Cast/Actors** | Bright Green (#00ff00) | Speaking Characters |
+| **Non-Speaking** | Soft Green (#b6d7a8) | Background/Atmosphere characters |
+| **Props** | Yellow (#ffff00) | Handheld or interacted objects |
+| **Wardrobe** | Pink (#ead1dc) | Clothing and accessories |
+| **Vehicles** | Blue (#4a86e8) | Cars, planes, boats, etc. |
+| **SFX** | Light Cyan (#cfe2f3) | Practical sound effects |
+| **VFX** | Cyan (#00ffff) | Visual effects requirements |
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📧 Email Template for Users
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Subject: Unleash the Power of Your Script with ScriptBreakdown.AI!**
+
+Hi [User Name],
+
+We're excited to have you on board with ScriptBreakdown.AI! Transforming your screenplay into a production-ready breakdown has never been easier.
+
+To get started, follow these simple steps:
+
+1. **Grant Access**: Share your Google Doc with `breakdown-ai@brack-down-ai.iam.gserviceaccount.com` as an **Editor**.
+2. **Format Characters**: Use our smart pattern `NAME (Sex) (Age) (Build) (Wardrobe)` when introducing characters in your script for perfect extraction.
+3. **Analyze**: Paste your URL at [Your-App-URL] and click "Break It Down".
+
+In seconds, you'll have a full scene-by-scene breakdown and a beautifully annotated Google Doc waiting for you.
+
+Happy producing!
+
+Best regards,
+The ScriptBreakdown.AI Team
