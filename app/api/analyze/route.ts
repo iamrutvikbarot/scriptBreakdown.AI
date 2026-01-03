@@ -5,25 +5,26 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { text, fileUrl } = await req.json();
+    const { fileUrl } = await req.json();
 
-    let scriptText = text;
+    if (!fileUrl) {
+      return NextResponse.json({ success: false, error: "No Google Doc URL provided" }, { status: 400 });
+    }
 
-    // 1. Handle Google Doc URL
-    if (fileUrl) {
-      if (!fileUrl.includes('docs.google.com')) {
-        return NextResponse.json({ success: false, error: "Invalid Google Doc URL" }, { status: 400 });
-      }
-      try {
-        scriptText = await extractTextFromGoogleDoc(fileUrl);
-      } catch (error) {
-        console.error("Google Doc Extraction Failed:", error);
-        return NextResponse.json({ success: false, error: "Failed to read Google Doc" }, { status: 400 });
-      }
+    if (!fileUrl.includes('docs.google.com')) {
+      return NextResponse.json({ success: false, error: "Invalid Google Doc URL" }, { status: 400 });
+    }
+
+    let scriptText = "";
+    try {
+      scriptText = await extractTextFromGoogleDoc(fileUrl);
+    } catch (error) {
+      console.error("Google Doc Extraction Failed:", error);
+      return NextResponse.json({ success: false, error: "Failed to read Google Doc" }, { status: 400 });
     }
 
     if (!scriptText) {
-      return NextResponse.json({ success: false, error: "No script text provided" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "No script text found in document" }, { status: 400 });
     }
 
     // 2. Split into scenes
@@ -37,8 +38,8 @@ export async function POST(req: Request) {
     const customStream = new ReadableStream({
       async start(controller) {
 
-        // Notify client about total estimated scenes (optional, but good for progress)
-        // controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', total: scenes.length }) + '\n'));
+        // Notify client about total estimated scenes
+        controller.enqueue(encoder.encode(JSON.stringify({ type: 'meta', total: scenes.length }) + '\n'));
 
         // Process scenes sequentially
         for (let i = 0; i < scenes.length; i++) {

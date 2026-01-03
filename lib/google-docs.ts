@@ -146,24 +146,26 @@ export async function highlightEntities(docId: string, data: ScriptData) {
       if (scene.breakdown_name) addHighlight(scene.breakdown_name, CATEGORY_COLORS.ID);
 
       // Lists
-      scene.actors.forEach(a => addHighlight(a, CATEGORY_COLORS.ACTOR));
-      scene.non_speaking_roles.forEach(r => addHighlight(r, CATEGORY_COLORS.NON_SPEAKING));
-      scene.props.forEach(p => addHighlight(p, CATEGORY_COLORS.PROP));
-      scene.wardrobe.forEach(w => addHighlight(w, CATEGORY_COLORS.WARDROBE));
-      scene.set_dec.forEach(s => addHighlight(s, CATEGORY_COLORS.SET_DEC));
-      scene.vehicles.forEach(v => addHighlight(v, CATEGORY_COLORS.VEHICLE));
-      scene.stunts.forEach(s => addHighlight(s, CATEGORY_COLORS.STUNT));
-      scene.sfx.forEach(s => addHighlight(s, CATEGORY_COLORS.SFX));
-      scene.vfx.forEach(v => addHighlight(v, CATEGORY_COLORS.VFX));
-      scene.item_quantity.forEach(q => addHighlight(q, CATEGORY_COLORS.QUANTITY));
-      scene.additional_scheduling.forEach(n => addHighlight(n, CATEGORY_COLORS.NOTE));
-      scene.makeup.forEach(m => addHighlight(m, CATEGORY_COLORS.MAKEUP));
+      (scene.actors || []).forEach(a => addHighlight(a, CATEGORY_COLORS.ACTOR));
+      (scene.non_speaking_roles || []).forEach(r => addHighlight(r, CATEGORY_COLORS.NON_SPEAKING));
+      (scene.props || []).forEach(p => addHighlight(p, CATEGORY_COLORS.PROP));
+      (scene.wardrobe || []).forEach(w => addHighlight(w, CATEGORY_COLORS.WARDROBE));
+      (scene.set_dec || []).forEach(s => addHighlight(s, CATEGORY_COLORS.SET_DEC));
+      (scene.vehicles || []).forEach(v => addHighlight(v, CATEGORY_COLORS.VEHICLE));
+      (scene.stunts || []).forEach(s => addHighlight(s, CATEGORY_COLORS.STUNT));
+      (scene.sfx || []).forEach(s => addHighlight(s, CATEGORY_COLORS.SFX));
+      (scene.vfx || []).forEach(v => addHighlight(v, CATEGORY_COLORS.VFX));
+      (scene.item_quantity || []).forEach(q => addHighlight(q, CATEGORY_COLORS.QUANTITY));
+      (scene.additional_scheduling || []).forEach(n => addHighlight(n, CATEGORY_COLORS.NOTE));
+      (scene.makeup || []).forEach(m => addHighlight(m, CATEGORY_COLORS.MAKEUP));
 
       // Cast Details
-      scene.cast_details.age.forEach(a => addHighlight(a, CATEGORY_COLORS.AGE));
-      scene.cast_details.gender.forEach(g => addHighlight(g, CATEGORY_COLORS.GENDER));
-      scene.cast_details.build.forEach(b => addHighlight(b, CATEGORY_COLORS.BUILD));
-      scene.cast_details.ethnicity.forEach(e => addHighlight(e, CATEGORY_COLORS.ETHNICITY));
+      if (scene.cast_details) {
+        (scene.cast_details.age || []).forEach(a => addHighlight(a, CATEGORY_COLORS.AGE));
+        (scene.cast_details.gender || []).forEach(g => addHighlight(g, CATEGORY_COLORS.GENDER));
+        (scene.cast_details.build || []).forEach(b => addHighlight(b, CATEGORY_COLORS.BUILD));
+        (scene.cast_details.ethnicity || []).forEach(e => addHighlight(e, CATEGORY_COLORS.ETHNICITY));
+      }
     });
 
     // 3. Batch Update (Google limits batch size, but for a script it should be okay or we optimize later)

@@ -41,14 +41,15 @@ interface ScriptData {
 
 export default function Home() {
   const { showToast } = useToast();
-  const [input, setInput] = useState('');
   const [result, setResult] = useState<ScriptData | null>(null);
   const [loading, setLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [provider, setProvider] = useState('nvidia');
 
-  const [inputMode, setInputMode] = useState<'text' | 'url'>('text');
   const [docUrl, setDocUrl] = useState('');
+  
+  // Progress State
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
 
   const triggerAutoAnnotation = async (docId: string, data: ScriptData) => {
     try {
@@ -71,26 +72,16 @@ export default function Home() {
   };
 
   const handleAnalyze = async () => {
-    if (!input && !docUrl) return;
+    if (!docUrl) return;
     setLoading(true);
     setResult(null);
+    setProgress({ current: 0, total: 0 });
 
-    // Determine input and provider based on mode
-    // Current Document ID (if relevant)
-    let currentDocUrl = "";
-    
-    // Prepare payload
     const payload: any = {
       provider: 'nvidia',
-      stream: true
+      stream: true,
+      fileUrl: docUrl
     };
-
-    if (inputMode === 'url') {
-      currentDocUrl = docUrl;
-      payload.fileUrl = docUrl;
-    } else {
-      payload.text = input;
-    }
 
     try { 
       // No need to pre-extract; the API handles it
@@ -129,17 +120,24 @@ export default function Home() {
            for (const line of lines) {
              if (line.trim()) {
                try {
-                 const newScene = JSON.parse(line);
-                 setResult(prev => {
-                   if (!prev) return { scenes: [newScene] };
-                   return { 
-                     ...prev, 
-                     scenes: [...prev.scenes, newScene].sort((a,b) => a.scene_number - b.scene_number) 
-                   };
-                 });
+                 const parsed = JSON.parse(line);
+
+                 // Check for Meta Message
+                 if (parsed.type === 'meta' && typeof parsed.total === 'number') {
+                   setProgress(prev => ({ ...prev, total: parsed.total }));
+                   continue;
+                 }
+
+                 // It's a scene
+                 const newScene = parsed;
                  accumulatedScenes.push(newScene);
-                 // Update state with sorted scenes for immediate UI display
-                 setResult({ scenes: [...accumulatedScenes].sort((a,b) => a.scene_number - b.scene_number) });
+                 
+                 // Update Result State
+                 setResult({ scenes: [...accumulatedScenes].sort((a: any, b: any) => a.scene_number - b.scene_number) });
+                 
+                 // Update Progress
+                 setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+
                } catch (e) {
                  console.error("Failed to parse chunk:", line, e);
                }
@@ -154,8 +152,8 @@ export default function Home() {
       }
 
       // After streaming is complete, trigger auto-annotation if applicable
-      if (inputMode === 'url' && currentDocUrl && accumulatedScenes.length > 0) {
-        const docIdMatch = currentDocUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (docUrl && accumulatedScenes.length > 0) {
+        const docIdMatch = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (docIdMatch && docIdMatch[1]) {
           triggerAutoAnnotation(docIdMatch[1], { scenes: accumulatedScenes });
         } else {
@@ -168,6 +166,10 @@ export default function Home() {
     }
     setLoading(false);
   };
+
+  const progressPercentage = progress.total > 0 
+    ? Math.min(100, Math.round((progress.current / progress.total) * 100)) 
+    : 0;
 
   return (
     <main className="min-h-screen text-gray-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-100 overflow-x-hidden flex flex-col">
@@ -196,106 +198,74 @@ export default function Home() {
         {/* Input Control Center */}
         <div className="max-w-4xl mx-auto mb-12 md:mb-20">
           
-          {/* Toggle Switch */}
-          <div className="flex justify-center mb-6 md:mb-8">
-            <div className="glass-panel p-1 rounded-xl flex relative w-full max-w-[340px] sm:max-w-none sm:w-auto">
-              <div 
-                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gray-800/80 rounded-lg transition-all duration-300 ease-out shadow-lg ${
-                  inputMode === 'text' ? 'left-1' : 'left-[calc(50%+3px)]'
-                }`}
-              />
-              <button
-                onClick={() => setInputMode('text')}
-                className={`relative z-10 flex-1 sm:flex-none px-4 sm:px-8 py-2.5 rounded-lg text-xs sm:text-sm font-bold tracking-wide transition-colors sm:w-40 cursor-pointer ${
-                  inputMode === 'text' ? 'text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                PASTE SCRIPT
-              </button>
-              <button
-                onClick={() => setInputMode('url')}
-                className={`relative z-10 flex-1 sm:flex-none px-4 sm:px-8 py-2.5 rounded-lg text-xs sm:text-sm font-bold tracking-wide transition-colors sm:w-40 cursor-pointer ${
-                  inputMode === 'url' ? 'text-blue-300' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                GOOGLE DOC
-              </button>
-            </div>
-          </div>
-
           {/* Main Input Panel */}
           <div className="glass-panel rounded-2xl md:rounded-3xl p-2 md:p-3 shadow-2xl shadow-black/50 mx-2 md:mx-0">
             <div className="bg-black/40 rounded-xl md:rounded-2xl p-4 md:p-8 space-y-4 md:space-y-6 border border-white/5">
               
-              {inputMode === 'text' ? (
-                <textarea
-                  className="w-full h-64 md:h-80 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none resize-y font-mono text-sm md:text-base leading-relaxed scrollbar-thin scrollbar-thumb-gray-700 hover:scrollbar-thumb-gray-600"
-                  placeholder="EXT. SPACE - NIGHT&#10;&#10;A starship glides silently..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  spellCheck="false"
-                />
-              ) : (
-                <div className="h-64 md:h-80 flex flex-col justify-center items-center gap-4 md:gap-6">
-                  <div className="w-full max-w-lg space-y-3 px-2">
-                    <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">Google Doc URL</label>
-                    <input
-                      type="url"
-                      className="glass-input w-full text-gray-200 p-3 md:p-4 rounded-xl focus:outline-none font-mono text-sm placeholder-gray-600"
-                      placeholder="https://docs.google.com/document/d/..."
-                      value={docUrl}
-                      onChange={(e) => setDocUrl(e.target.value)}
-                    />
-                    <div className="flex flex-col gap-2 mt-2 ml-1">
-                      <p className="text-[10px] md:text-xs text-gray-500 flex items-center gap-2">
-                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
-                         Must be shared with Service Account (Editor Mode):
-                      </p>
-                      <div className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
-                           onClick={() => {
-                             navigator.clipboard.writeText("breakdown-ai@brack-down-ai.iam.gserviceaccount.com");
-                             showToast("Email copied to clipboard!", "success");
-                           }}
-                           title="Click to copy"
-                      >
-                        <code className="text-xs text-emerald-400 font-mono break-all">
-                          breakdown-ai@brack-down-ai.iam.gserviceaccount.com
-                        </code>
-                        <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                      </div>
+              <div className="h-48 md:h-64 flex flex-col justify-center items-center gap-4 md:gap-6">
+                <div className="w-full max-w-lg space-y-3 px-2">
+                  <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">Google Doc URL</label>
+                  <input
+                    type="url"
+                    className="glass-input w-full text-gray-200 p-3 md:p-4 rounded-xl focus:outline-none font-mono text-sm placeholder-gray-600"
+                    placeholder="https://docs.google.com/document/d/..."
+                    value={docUrl}
+                    onChange={(e) => setDocUrl(e.target.value)}
+                  />
+                  <div className="flex flex-col gap-2 mt-2 ml-1">
+                    <p className="text-[10px] md:text-xs text-gray-500 flex items-center gap-2">
+                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
+                       Must be shared with Service Account (Editor Mode):
+                    </p>
+                    <div className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
+                         onClick={() => {
+                           navigator.clipboard.writeText("breakdown-ai@brack-down-ai.iam.gserviceaccount.com");
+                           showToast("Email copied to clipboard!", "success");
+                         }}
+                         title="Click to copy"
+                    >
+                      <code className="text-xs text-emerald-400 font-mono break-all">
+                        breakdown-ai@brack-down-ai.iam.gserviceaccount.com
+                      </code>
+                      <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/5 gap-4">
                 <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1">
                   AI MODEL: NVIDIA LLAMA-3.1-70B
                 </div>
-                <button
-                  onClick={handleAnalyze}
-                  disabled={loading || (inputMode === 'text' && !input) || (inputMode === 'url' && !docUrl)}
-                  className="group relative bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden w-full md:w-auto order-1 md:order-2 cursor-pointer"
-                >
-                  <div className="relative z-10 flex items-center justify-center gap-2">
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span>ANALYZING...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>BREAK IT DOWN</span>
-                        <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                      </>
-                    )}
+                {loading ? (
+                  <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
+                    <div className="flex justify-between text-xs font-mono text-emerald-400">
+                      <span>ANALYZING SCENE {progress.current} / {progress.total > 0 ? progress.total : '...'}</span>
+                      <span>{progressPercentage}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 relative">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-300 ease-out relative"
+                        style={{ width: `${progressPercentage}%` }}
+                      >
+                         <div className="absolute inset-0 bg-white/20 animate-[shimmer_1s_infinite] skew-x-12"></div>
+                      </div>
+                    </div>
                   </div>
-                  {/* Button Glow Effect */}
-                  <div className="absolute inset-0 bg-emerald-400/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </button>
+                ) : (
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={loading || !docUrl}
+                    className="group relative bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden w-full md:w-auto order-1 md:order-2 cursor-pointer"
+                  >
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      <span>BREAK IT DOWN</span>
+                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </div>
+                    {/* Button Glow Effect */}
+                    <div className="absolute inset-0 bg-emerald-400/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -381,13 +351,16 @@ export default function Home() {
                           ))}
 
                           {/* Cast Details Section */}
-                          {(scene.cast_details?.age?.length > 0 || scene.cast_details?.gender?.length > 0) && (
+                          {(scene.cast_details?.age?.length > 0 || scene.cast_details?.gender?.length > 0 || scene.cast_details?.build?.length > 0) && (
                             <div className="bg-white/5 rounded-lg p-3 text-xs space-y-1.5 border border-white/5 mt-2">
-                               {scene.cast_details.age?.length > 0 && (
-                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500">Age Range</span> <span className="text-gray-300 font-mono text-right">{scene.cast_details.age.join(', ')}</span></div>
-                               )}
                                {scene.cast_details.gender?.length > 0 && (
-                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500">Gender</span> <span className="text-gray-300 font-mono text-right">{scene.cast_details.gender.join(', ')}</span></div>
+                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Sex</span> <span className="text-emerald-400 font-mono text-right">{scene.cast_details.gender.join(', ')}</span></div>
+                               )}
+                               {scene.cast_details.age?.length > 0 && (
+                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Age</span> <span className="text-blue-300 font-mono text-right">{scene.cast_details.age.join(', ')}</span></div>
+                               )}
+                               {scene.cast_details.build?.length > 0 && (
+                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Build</span> <span className="text-gray-300 font-mono text-right">{scene.cast_details.build.join(', ')}</span></div>
                                )}
                             </div>
                           )}
@@ -460,8 +433,8 @@ export default function Home() {
                                <span className="text-orange-400 font-bold text-[10px] tracking-wider block mb-2">STUNTS</span>
                                <ul className="space-y-1">
                                  {scene.stunts.map((st, i) => (
-                                  <li key={i} className="text-orange-200 text-xs border-l-2 border-orange-500/30 pl-2">{st}</li>
-                                ))}
+                                   <li key={i} className="text-orange-200 text-xs border-l-2 border-orange-500/30 pl-2">{st}</li>
+                                 ))}
                                </ul>
                              </div>
                           )}
@@ -515,7 +488,6 @@ export default function Home() {
                           )}
                         </div>
                       </div>
-
                     </div>
                   </div>
                 </div>
@@ -523,7 +495,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
       </div>
 
       {/* FOOTER SECTION: SIGNATURE */}

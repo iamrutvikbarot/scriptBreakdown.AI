@@ -76,101 +76,77 @@ export async function analyzeScript(text: string, sceneIndex: number = 1): Promi
 
   const completion = await client.chat.completions.create({
     model: "meta/llama-3.1-70b-instruct",
-    temperature: 0,
+    temperature: 0, // Keep 0 for maximum deterministic formatting
     top_p: 0.1,
     max_tokens: 4096,
     messages: [
       {
         role: "system",
         content: `
-You are a professional Film Script Breakdown Assistant used in real-world film production.
+You are a Film Production AI specialized in extracting data from script text.
 
-RULES:
-- Analyze ONLY the provided scene text.
-- This text is likely a single scene or a fragment.
-- START scene numbering at ${sceneIndex} (or use the scene number found in the header if explicit).
-- NEVER guess, infer, or invent information
-- If data is missing, return empty arrays or empty strings
-- Output VALID JSON ONLY
-- No explanations, no markdown, no extra text
+### CRITICAL INSTRUCTION
+The script text contains character details **EMBEDDED inside action paragraphs**.
+You must scan the sentences to find the specific character definition pattern.
+
+### PARSING RULES
+
+1. **SCENE HEADERS:**
+   - Pattern: "INT./EXT. - LOCATION - TIME" (Allow for spaces like "INT .") INT./EXT. - LOCATION you have to consider this as location and time as a Time.
+   - Example: "INT. - AIRPLANE - DAY"
+
+2. **CHARACTER DEFINITIONS (EMBEDDED):**
+   - Look for this EXACT pattern inside sentences:
+     **NAME (Sex) (Age) (Build) (Wardrobe)**
+   
+   - **Scanning Logic:**
+     - When you see a Capitalized Name followed immediately by a parenthesis, check for the sequence of 4 brackets.
+     - **Name Cleaning:** If the name has a possessive (e.g., "APRIL'S"), remove the "'S" (Output: "APRIL").
+     - **Bracket Mapping:**
+       - (1st) = Sex
+       - (2nd) = Age
+       - (3rd) = Build (Capture full text, e.g., "big, strong, toxic")
+       - (4th) = Wardrobe (Capture full text)
+
+3. **CONTEXTUAL EXTRACTION:**
+   - **Props:** Extract items mentioned in UPPERCASE or implied usage (e.g., "PHONE").
+   - **Action:** Summarize what happens in the scene.
+
+### OUTPUT FORMAT (VALID JSON ONLY):
+Return a JSON object with a "scenes" array. Do not include markdown formatting (like \`\`\`json).
+
+{
+  "scenes": [
+    {
+      "scene_number": ${sceneIndex}, 
+      "header_text": "Full header line",
+      "int_ext": "INT/EXT",
+      "location": "Location Name",
+      "time_of_day": "DAY/NIGHT",
+      "characters": [
+        {
+          "name": "NAME",
+          "gender": "Sex",
+          "age": "Age",
+          "build": "Build",
+          "wardrobe": "Wardrobe desc",
+          "is_speaking": true/false
+        }
+      ],
+      "props": ["item 1", "item 2"],
+      "vehicles": [],
+      "sfx": [],
+      "vfx": [],
+      "scene_summary": "Brief factual summary."
+    }
+  ]
+}
         `,
       },
       {
         role: "user",
         content: `
-Extract a detailed film production breakdown from the scene text below.
-
-BREAKDOWN DEFINITIONS (STRICT):
-
-- Scene: Starts at every INT/EXT or explicit scene heading
-- Scene Transition: CUT TO, FADE IN, FADE OUT, DISSOLVE
-- Time Of Day: DAY, NIGHT, EVENING, MORNING
-- Scene Location: Story location in script
-- Prod Location: Physical shoot location if stated
-- INT/EXT: Use exactly "INT" or "EXT"
-- Actor: Speaking characters only
-- Non Speaking Roles: Mentioned characters without dialogue
-- Cast Age: Only if explicitly stated
-- Cast Build: Only if explicitly stated
-- Cast Ethnicity: Only if explicitly stated
-- Cast Gender: Only if explicitly stated
-- Makeup: Explicit makeup requirements
-- Props: Handheld or interacted objects
-- Item Quantity: Quantity ONLY if stated
-- Wardrobe: Explicit clothing mentions
-- Set Dec: Background or set elements
-- Vehicle: Any vehicles mentioned
-- Stunt: Physical actions requiring coordination
-- SFX: Practical sound effects
-- VFX: Post-production visual effects
-- Scene Length: Duration ONLY if stated
-- Scene Summary: One factual sentence only
-- Additional Scheduling: Weather, night shoot, kids, animals, crowd
-- Breakdown Name: Scene-specific identifier if stated
-
-OUTPUT FORMAT (STRICT JSON):
-
-{
-  "scenes": [
-    {
-      "scene_number": 1,
-      "int_ext": "INT",
-      "scene_location": "",
-      "prod_location": "",
-      "time_of_day": "",
-      "scene_transition": "",
-      "scene_summary": "",
-
-      "props": [],
-      "item_quantity": [],
-      "wardrobe": [],
-      "set_dec": [],
-      "vehicles": [],
-      "stunts": [],
-      "sfx": [],
-      "vfx": [],
-
-      "actors": [],
-      "non_speaking_roles": [],
-
-      "cast_details": {
-        "age": [],
-        "build": [],
-        "ethnicity": [],
-        "gender": []
-      },
-
-      "makeup": [],
-      "scene_length": "",
-      "additional_scheduling": [],
-      "breakdown_name": ""
-    }
-  ]
-}
-
-IMPORTANT:
-- Absolute accuracy over completeness
-- Output JSON ONLY
+Analyze the following script text. Ensure exact extraction of the "Name (Sex) (Age)..." format.
 
 SCRIPT TEXT:
 ${text}
