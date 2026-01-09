@@ -1,5 +1,5 @@
 // src/lib/ai-service.ts
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 /* ------------------------------------------------------------------ */
 /* 1. Data Contract (DO NOT CHANGE)                                    */
@@ -42,120 +42,111 @@ export interface ScriptData {
 }
 
 /* ------------------------------------------------------------------ */
-/* 2. Safe JSON Extraction Helper                                     */
+/* 3. Main Script Analysis Function                                   */
 /* ------------------------------------------------------------------ */
 
-function cleanAndParseJSON(rawText: string): ScriptData {
+async function generateWithRetry(
+  ai: any,
+  payload: any,
+  retries = 5,
+  delay = 1000
+) {
   try {
-    const firstOpen = rawText.indexOf("{");
-    const lastClose = rawText.lastIndexOf("}");
+    return await ai.models.generateContent(payload);
+  } catch (error: any) {
+    const status = error?.error?.code || error?.status;
 
-    if (firstOpen === -1 || lastClose === -1) {
-      throw new Error("No JSON object found in AI response");
+    if (status === 503 && retries > 0) {
+      console.warn(
+        `Gemini overloaded. Retrying in ${delay}ms... (${retries} left)`
+      );
+      await new Promise((res) => setTimeout(res, delay));
+      return generateWithRetry(ai, payload, retries - 1, delay * 2);
     }
 
-    const jsonString = rawText.substring(firstOpen, lastClose + 1);
-    return JSON.parse(jsonString) as ScriptData;
-  } catch (error) {
-    console.error("❌ Failed to parse AI response:");
-    console.error(rawText);
     throw error;
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* 3. NVIDIA Script Analysis Function                                  */
-/* ------------------------------------------------------------------ */
+export function parseLLMJson(data: any) {
+  if (data === "") {
+    throw new Error("AI response not available.");
+  }
 
+  // Remove ```json and ``` wrappers
+  const raw = data
+    .replace(/```json\s*/i, "")
+    .replace(/```$/, "")
+    .trim();
 
-export async function analyzeScript(text: string, sceneIndex: number = 1): Promise<ScriptData> {
-  const client = new OpenAI({
-    baseURL: "https://integrate.api.nvidia.com/v1",
-    apiKey: process.env.NVIDIA_API_KEY,
-  });
-
-  const completion = await client.chat.completions.create({
-    model: "meta/llama-3.1-70b-instruct",
-    temperature: 0, // Keep 0 for maximum deterministic formatting
-    top_p: 0.1,
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "system",
-        content: `
-You are a Film Production AI specialized in extracting data from script text.
-
-### CRITICAL INSTRUCTION
-The script text contains character details **EMBEDDED inside action paragraphs**.
-You must scan the sentences to find the specific character definition pattern.
-
-### PARSING RULES
-
-1. **SCENE HEADERS:**
-   - Pattern: "INT./EXT. - LOCATION - TIME" (Allow for spaces like "INT .") INT./EXT. - LOCATION you have to consider this as location and time as a Time.
-   - Example: "INT. - AIRPLANE - DAY"
-
-2. **CHARACTER DEFINITIONS (EMBEDDED):**
-   - Look for this EXACT pattern inside sentences:
-     **NAME (Sex) (Age) (Build) (Wardrobe)**
-   
-   - **Scanning Logic:**
-     - When you see a Capitalized Name followed immediately by a parenthesis, check for the sequence of 4 brackets.
-     - **Name Cleaning:** If the name has a possessive (e.g., "APRIL'S"), remove the "'S" (Output: "APRIL").
-     - **Bracket Mapping:**
-       - (1st) = Sex
-       - (2nd) = Age
-       - (3rd) = Build (Capture full text, e.g., "big, strong, toxic")
-       - (4th) = Wardrobe (Capture full text)
-
-3. **CONTEXTUAL EXTRACTION:**
-   - **Props:** Extract items mentioned in UPPERCASE or implied usage (e.g., "PHONE").
-   - **Action:** Summarize what happens in the scene.
-
-### OUTPUT FORMAT (VALID JSON ONLY):
-Return a JSON object with a "scenes" array. Do not include markdown formatting (like \`\`\`json).
-
-{
-  "scenes": [
-    {
-      "scene_number": ${sceneIndex}, 
-      "header_text": "Full header line",
-      "int_ext": "INT/EXT",
-      "location": "Location Name",
-      "time_of_day": "DAY/NIGHT",
-      "characters": [
-        {
-          "name": "NAME",
-          "gender": "Sex",
-          "age": "Age",
-          "build": "Build",
-          "wardrobe": "Wardrobe desc",
-          "is_speaking": true/false
-        }
-      ],
-      "props": ["item 1", "item 2"],
-      "vehicles": [],
-      "sfx": [],
-      "vfx": [],
-      "scene_summary": "Brief factual summary."
-    }
-  ]
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("Failed to parse JSON:", raw);
+    throw err;
+  }
 }
-        `,
-      },
-      {
-        role: "user",
-        content: `
-Analyze the following script text. Ensure exact extraction of the "Name (Sex) (Age)..." format.
 
-SCRIPT TEXT:
-${text}
-        `,
-      },
-    ],
+export async function analyzeScript(
+  text: string,
+  sceneIndex: number = 1
+): Promise<ScriptData> {
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY!,
   });
 
-  const raw = completion.choices[0]?.message?.content ?? "{}";
+  const prompt = `Return ONLY a valid JSON array.
+            Each item must contain:
+            - text
+            - category
 
-  return cleanAndParseJSON(raw);
+            Allowed categories ONLY:
+            SCENE_HEADER, TRANSITION, TIME, LOCATION, PROD_LOC,
+            ACTOR, NON_SPEAKING, AGE, BUILD, ETHNICITY, GENDER,
+            MAKEUP, PROP, QUANTITY, WARDROBE, SFX, VFX, SET_DEC,
+            STUNT, VEHICLE, NOTE, ID, INT_EXT
+
+            RULES:
+            1. Any full scene line like:
+              "EXT. - STREET - DAY",
+              "INT. - HOSPITAL ROOM - NIGHT",
+              "CUT TO - SCENE 1 - YEARS EARLIER"
+              MUST be returned as SCENE_HEADER (entire line).
+
+            2. Also extract scene parts separately:
+              INT./EXT. → INT_EXT
+              Location → LOCATION
+              Time → TIME
+              Scene numbers → ID
+
+            3. Script starts with "Note:" then the whole paragraph should considered as [NOTE] category
+
+            4. If text appears inside parentheses "( )",
+              return the text WITH brackets and categorize correctly.
+
+            5. Character names in CAPS → ACTOR.
+              Unnamed groups (e.g. GIRLS 1-2) → NON_SPEAKING.
+
+            6. Camera directions → VFX.
+              Transitions → TRANSITION.
+              Sounds → SFX.
+
+            7. Objects → PROP.
+              Vehicles → VEHICLE.
+              Furniture/room items → SET_DEC.
+
+            8. Preserve order. Do not invent or omit items.
+
+            Script:
+            ${text}
+            `;
+
+  const completion = await generateWithRetry(ai, {
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+  });
+
+  const raw = completion.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+
+  return parseLLMJson(raw);
 }

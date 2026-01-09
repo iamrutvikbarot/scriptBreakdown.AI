@@ -1,8 +1,8 @@
 "use client";
-import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { useToast } from './components/ToastProvider';
+import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useToast } from "./components/ToastProvider";
 
 interface ScriptData {
   scenes: {
@@ -116,20 +116,20 @@ export default function Home() {
   const [result, setResult] = useState<ScriptData | null>(null);
   const [loading, setLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [provider, setProvider] = useState('nvidia');
+  const [provider, setProvider] = useState("nvidia");
 
-  const [docUrl, setDocUrl] = useState('');
-  
+  const [docUrl, setDocUrl] = useState("");
+
   // Progress State
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  const triggerAutoAnnotation = async (docId: string, data: ScriptData) => {
+  const triggerAutoAnnotation = async (docId: string, data: any) => {
     try {
       console.log("Triggering auto-annotation for doc:", docId);
-      const res = await fetch('/api/annotate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/annotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ docId, scriptData: data }),
       });
       if (res.ok) {
@@ -151,98 +151,47 @@ export default function Home() {
     setProgress({ current: 0, total: 0 });
 
     const payload: any = {
-      provider: 'nvidia',
+      provider: "nvidia",
       stream: true,
-      fileUrl: docUrl
+      fileUrl: docUrl,
     };
 
-    try { 
+    try {
       // No need to pre-extract; the API handles it
-      
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        throw new Error(res.statusText + await res.text());
+        throw new Error(res.statusText + (await res.text()));
       }
 
       if (!res.body) throw new Error("No response body");
 
-      // Stream Reader
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let partialLine = "";
-      
-      // Initialize results accumulator for auto-annotation
-      const accumulatedScenes: any[] = [];
-
-      while (!done) {
-        const { value, done: isDone } = await reader.read();
-        done = isDone;
-        if (value) {
-           const chunk = decoder.decode(value, { stream: true });
-           const lines = (partialLine + chunk).split('\n');
-           
-           // The last element might be an incomplete line
-           partialLine = lines.pop() || "";
-
-           for (const line of lines) {
-             if (line.trim()) {
-               try {
-                 const parsed = JSON.parse(line);
-
-                 // Check for Meta Message
-                 if (parsed.type === 'meta' && typeof parsed.total === 'number') {
-                   setProgress(prev => ({ ...prev, total: parsed.total }));
-                   continue;
-                 }
-
-                 // It's a scene
-                 const newScene = parsed;
-                 accumulatedScenes.push(newScene);
-                 
-                 // Update Result State
-                 setResult({ scenes: [...accumulatedScenes].sort((a: any, b: any) => a.scene_number - b.scene_number) });
-                 
-                 // Update Progress
-                 setProgress(prev => ({ ...prev, current: prev.current + 1 }));
-
-               } catch (e) {
-                 console.error("Failed to parse chunk:", line, e);
-               }
-             }
-           }
-        }
-      }
-
-      // Check for empty results
-      if (accumulatedScenes.length === 0) {
-        showToast("Analysis complete, but no scenes were found.", "error");
-      }
+      const text = await res.text();
+      const data = JSON.parse(text);
 
       // After streaming is complete, trigger auto-annotation if applicable
-      if (docUrl && accumulatedScenes.length > 0) {
+      if (docUrl) {
         const docIdMatch = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
         if (docIdMatch && docIdMatch[1]) {
-          triggerAutoAnnotation(docIdMatch[1], { scenes: accumulatedScenes });
+          triggerAutoAnnotation(docIdMatch[1], data?.results);
         } else {
           console.warn("Could not extract docId from URL for auto-annotation.");
         }
       }
-
     } catch (e) {
       showToast("Error processing script: " + e, "error");
     }
     setLoading(false);
   };
 
-  const progressPercentage = progress.total > 0 
-    ? Math.min(100, Math.round((progress.current / progress.total) * 100)) 
-    : 0;
+  const progressPercentage =
+    progress.total > 0
+      ? Math.min(100, Math.round((progress.current / progress.total) * 100))
+      : 0;
 
   return (
     <main className="min-h-screen text-gray-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-100 overflow-x-hidden flex flex-col">
@@ -253,32 +202,47 @@ export default function Home() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-20 flex-grow w-full">
-        
         {/* Navigation Links - Top Right */}
         <div className="absolute top-6 right-6 flex items-center gap-4 z-50">
-          <button 
+          <button
             onClick={() => setIsGuideOpen(true)}
             className="glass-panel px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all group shadow-xl text-xs font-bold tracking-wider cursor-pointer"
           >
-            <span className="text-gray-400 group-hover:text-emerald-400">USER GUIDE</span>
-            <svg className="w-4 h-4 text-gray-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            <span className="text-gray-400 group-hover:text-emerald-400">
+              USER GUIDE
+            </span>
+            <svg
+              className="w-4 h-4 text-gray-500 group-hover:text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              ></path>
             </svg>
           </button>
 
-          <a 
-            href="https://github.com/iamrutvikbarot/scriptBreakdown.AI" 
-            target="_blank" 
+          <a
+            href="https://github.com/iamrutvikbarot/scriptBreakdown.AI"
+            target="_blank"
             rel="noopener noreferrer"
             className="glass-panel p-2.5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all group shadow-xl"
             title="View on GitHub"
           >
-            <svg className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            <svg
+              className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
             </svg>
           </a>
         </div>
-        
+
         {/* Header Section */}
         <header className="mb-10 md:mb-16 text-center space-y-4 md:space-y-6 relative">
           <div className="inline-block relative">
@@ -288,21 +252,24 @@ export default function Home() {
             <div className="absolute inset-0 bg-emerald-500/20 blur-[40px] md:blur-[60px] -z-10 opacity-50"></div>
           </div>
           <p className="text-gray-400 text-sm sm:text-lg md:text-xl font-light tracking-wide max-w-2xl mx-auto px-4">
-            Professional AI-powered breakdown for film production. <br className="hidden md:block"/>
-            <span className="text-gray-500 block mt-1">Transform your screenplay into actionable data in seconds.</span>
+            Professional AI-powered breakdown for film production.{" "}
+            <br className="hidden md:block" />
+            <span className="text-gray-500 block mt-1">
+              Transform your screenplay into actionable data in seconds.
+            </span>
           </p>
         </header>
 
         {/* Input Control Center */}
         <div className="max-w-4xl mx-auto mb-12 md:mb-20">
-          
           {/* Main Input Panel */}
           <div className="glass-panel rounded-2xl md:rounded-3xl p-2 md:p-3 shadow-2xl shadow-black/50 mx-2 md:mx-0">
             <div className="bg-black/40 rounded-xl md:rounded-2xl p-4 md:p-8 space-y-4 md:space-y-6 border border-white/5">
-              
               <div className="h-48 md:h-64 flex flex-col justify-center items-center gap-4 md:gap-6">
                 <div className="w-full max-w-lg space-y-3 px-2">
-                  <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">Google Doc URL</label>
+                  <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">
+                    Google Doc URL
+                  </label>
                   <input
                     type="url"
                     className="glass-input w-full text-gray-200 p-3 md:p-4 rounded-xl focus:outline-none font-mono text-sm placeholder-gray-600"
@@ -312,20 +279,35 @@ export default function Home() {
                   />
                   <div className="flex flex-col gap-2 mt-2 ml-1">
                     <p className="text-[10px] md:text-xs text-gray-500 flex items-center gap-2">
-                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
-                       Must be shared with Service Account (Editor Mode):
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
+                      Must be shared with Service Account (Editor Mode):
                     </p>
-                    <div className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
-                         onClick={() => {
-                           navigator.clipboard.writeText("breakdown-ai@brack-down-ai.iam.gserviceaccount.com");
-                           showToast("Email copied to clipboard!", "success");
-                         }}
-                         title="Click to copy"
+                    <div
+                      className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          "breakdown-ai@brack-down-ai.iam.gserviceaccount.com"
+                        );
+                        showToast("Email copied to clipboard!", "success");
+                      }}
+                      title="Click to copy"
                     >
                       <code className="text-xs text-emerald-400 font-mono break-all">
                         breakdown-ai@brack-down-ai.iam.gserviceaccount.com
                       </code>
-                      <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                      <svg
+                        className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors ml-2 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        ></path>
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -338,15 +320,18 @@ export default function Home() {
                 {loading ? (
                   <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
                     <div className="flex justify-between text-xs font-mono text-emerald-400">
-                      <span>ANALYZING SCENE {progress.current} / {progress.total > 0 ? progress.total : '...'}</span>
+                      <span>
+                        ANALYZING SCENE {progress.current} /{" "}
+                        {progress.total > 0 ? progress.total : "..."}
+                      </span>
                       <span>{progressPercentage}%</span>
                     </div>
                     <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 relative">
-                      <div 
+                      <div
                         className="h-full bg-emerald-500 transition-all duration-300 ease-out relative"
                         style={{ width: `${progressPercentage}%` }}
                       >
-                         <div className="absolute inset-0 bg-white/20 animate-[shimmer_1s_infinite] skew-x-12"></div>
+                        <div className="absolute inset-0 bg-white/20 animate-[shimmer_1s_infinite] skew-x-12"></div>
                       </div>
                     </div>
                   </div>
@@ -358,7 +343,19 @@ export default function Home() {
                   >
                     <div className="relative z-10 flex items-center justify-center gap-2">
                       <span>BREAK IT DOWN</span>
-                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                      <svg
+                        className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M14 5l7 7m0 0l-7 7m7-7H3"
+                        ></path>
+                      </svg>
                     </div>
                     {/* Button Glow Effect */}
                     <div className="absolute inset-0 bg-emerald-400/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -373,9 +370,11 @@ export default function Home() {
         {result && (
           <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6 mb-8 md:mb-12 px-2 md:px-0">
-              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">ANALYSIS RESULTS</h2>
+              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                ANALYSIS RESULTS
+              </h2>
               <div className="h-px bg-gradient-to-r from-gray-800 to-transparent flex-grow w-full md:w-auto"></div>
-              
+
               <div className="flex items-center gap-4 self-start md:self-auto">
                 {/* Auto-Sync is now active, no button needed */}
                 <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md">
@@ -383,25 +382,31 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            
+
             <div className="grid gap-6 md:gap-8">
               {(result.scenes || []).map((scene, i) => (
-                <div key={i} className="glass-panel rounded-2xl overflow-hidden transition-all hover:border-gray-700 group mx-2 md:mx-0">
-                  
+                <div
+                  key={i}
+                  className="glass-panel rounded-2xl overflow-hidden transition-all hover:border-gray-700 group mx-2 md:mx-0"
+                >
                   {/* Scene Header */}
                   <div className="bg-black/40 px-4 md:px-6 py-4 md:py-5 flex flex-wrap items-baseline gap-3 md:gap-4 border-b border-white/5 relative overflow-hidden">
-                     {/* Header Glow */}
-                     <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                     
+                    {/* Header Glow */}
+                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+
                     <span className="text-emerald-500 font-mono text-[10px] md:text-xs font-bold tracking-widest border border-emerald-500/20 px-2 py-0.5 rounded bg-emerald-500/10">
                       SCENE {scene.scene_number}
                     </span>
-                    
+
                     <h3 className="text-lg md:text-2xl font-black tracking-wide text-gray-100 font-mono uppercase flex-grow md:flex-grow-0">
-                      <span className="text-gray-500 mr-2">{scene.int_ext}</span>
+                      <span className="text-gray-500 mr-2">
+                        {scene.int_ext}
+                      </span>
                       {scene.scene_location}
                       <span className="text-gray-600 mx-1 md:mx-2 block md:inline my-1 md:my-0 h-0 md:h-auto"></span>
-                      <span className="text-blue-200 block md:inline text-base md:text-inherit">{scene.time_of_day}</span>
+                      <span className="text-blue-200 block md:inline text-base md:text-inherit">
+                        {scene.time_of_day}
+                      </span>
                     </h3>
 
                     {scene.scene_transition && (
@@ -409,16 +414,15 @@ export default function Home() {
                         {scene.scene_transition}
                       </span>
                     )}
-                    
+
                     {scene.breakdown_name && (
-                       <div className="w-full md:w-auto md:absolute md:top-2 md:right-4 opacity-75 md:opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono text-gray-700 mt-1 md:mt-0">
-                         ID: {scene.breakdown_name}
-                       </div>
+                      <div className="w-full md:w-auto md:absolute md:top-2 md:right-4 opacity-75 md:opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono text-gray-700 mt-1 md:mt-0">
+                        ID: {scene.breakdown_name}
+                      </div>
                     )}
                   </div>
 
                   <div className="p-4 md:p-8 space-y-6 md:space-y-8 bg-gradient-to-b from-transparent to-black/20">
-                    
                     {/* Summary */}
                     {scene.scene_summary && (
                       <div className="pl-4 border-l-2 border-gray-700 italic text-gray-400 text-sm md:text-lg font-light leading-relaxed">
@@ -427,7 +431,6 @@ export default function Home() {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
-                      
                       {/* CAST COLUMN */}
                       <div className="space-y-4 md:space-y-5">
                         <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
@@ -436,30 +439,62 @@ export default function Home() {
                         <div className="space-y-3">
                           <div className="flex flex-wrap gap-2">
                             {(scene.actors || []).map((actor, idx) => (
-                              <div key={idx} className="bg-blue-500/10 text-blue-200 px-3 py-1.5 rounded text-xs md:text-sm font-semibold border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-shadow cursor-default">
+                              <div
+                                key={idx}
+                                className="bg-blue-500/10 text-blue-200 px-3 py-1.5 rounded text-xs md:text-sm font-semibold border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)] hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-shadow cursor-default"
+                              >
                                 {actor}
                               </div>
                             ))}
                           </div>
-                          
+
                           {(scene.non_speaking_roles || []).map((role, idx) => (
-                            <div key={idx} className="text-gray-500 text-sm px-1 border-l border-gray-800 pl-2">
-                              {role} <span className="opacity-50 text-xs uppercase ml-1">Non-Speaking</span>
+                            <div
+                              key={idx}
+                              className="text-gray-500 text-sm px-1 border-l border-gray-800 pl-2"
+                            >
+                              {role}{" "}
+                              <span className="opacity-50 text-xs uppercase ml-1">
+                                Non-Speaking
+                              </span>
                             </div>
                           ))}
 
                           {/* Cast Details Section */}
-                          {(scene.cast_details?.age?.length > 0 || scene.cast_details?.gender?.length > 0 || scene.cast_details?.build?.length > 0) && (
+                          {(scene.cast_details?.age?.length > 0 ||
+                            scene.cast_details?.gender?.length > 0 ||
+                            scene.cast_details?.build?.length > 0) && (
                             <div className="bg-white/5 rounded-lg p-3 text-xs space-y-1.5 border border-white/5 mt-2">
-                               {scene.cast_details.gender?.length > 0 && (
-                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Sex</span> <span className="text-emerald-400 font-mono text-right">{scene.cast_details.gender.join(', ')}</span></div>
-                               )}
-                               {scene.cast_details.age?.length > 0 && (
-                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Age</span> <span className="text-blue-300 font-mono text-right">{scene.cast_details.age.join(', ')}</span></div>
-                               )}
-                               {scene.cast_details.build?.length > 0 && (
-                                 <div className="flex justify-between flex-wrap gap-1"><span className="text-gray-500 uppercase tracking-tighter opacity-50">Build</span> <span className="text-gray-300 font-mono text-right">{scene.cast_details.build.join(', ')}</span></div>
-                               )}
+                              {scene.cast_details.gender?.length > 0 && (
+                                <div className="flex justify-between flex-wrap gap-1">
+                                  <span className="text-gray-500 uppercase tracking-tighter opacity-50">
+                                    Sex
+                                  </span>{" "}
+                                  <span className="text-emerald-400 font-mono text-right">
+                                    {scene.cast_details.gender.join(", ")}
+                                  </span>
+                                </div>
+                              )}
+                              {scene.cast_details.age?.length > 0 && (
+                                <div className="flex justify-between flex-wrap gap-1">
+                                  <span className="text-gray-500 uppercase tracking-tighter opacity-50">
+                                    Age
+                                  </span>{" "}
+                                  <span className="text-blue-300 font-mono text-right">
+                                    {scene.cast_details.age.join(", ")}
+                                  </span>
+                                </div>
+                              )}
+                              {scene.cast_details.build?.length > 0 && (
+                                <div className="flex justify-between flex-wrap gap-1">
+                                  <span className="text-gray-500 uppercase tracking-tighter opacity-50">
+                                    Build
+                                  </span>{" "}
+                                  <span className="text-gray-300 font-mono text-right">
+                                    {scene.cast_details.build.join(", ")}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -467,29 +502,43 @@ export default function Home() {
 
                       {/* ART DEPT COLUMN */}
                       <div className="space-y-4 md:space-y-5">
-                         <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
+                        <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
                           <span className="text-lg">🎨</span> Art Dept
                         </h4>
                         <div className="space-y-4 text-sm">
-                          
                           {(scene.props || []).length > 0 && (
                             <div>
-                              <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">Props</span>
+                              <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">
+                                Props
+                              </span>
                               <div className="flex flex-wrap gap-2">
                                 {scene.props.map((p, idx) => (
-                                  <span key={idx} className="bg-red-500/10 text-red-300 px-2 py-1 rounded text-xs border border-red-500/20">{p}</span>
+                                  <span
+                                    key={idx}
+                                    className="bg-red-500/10 text-red-300 px-2 py-1 rounded text-xs border border-red-500/20"
+                                  >
+                                    {p}
+                                  </span>
                                 ))}
                               </div>
                             </div>
                           )}
- 
+
                           {(scene.item_quantity || []).length > 0 && (
                             <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">Quantities</span>
+                              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                                Quantities
+                              </span>
                               <ul className="space-y-1">
                                 {scene.item_quantity.map((q, idx) => (
-                                  <li key={idx} className="text-gray-400 text-xs font-mono flex items-start gap-2 break-all">
-                                    <span className="text-gray-700 min-w-[6px]">•</span> {q}
+                                  <li
+                                    key={idx}
+                                    className="text-gray-400 text-xs font-mono flex items-start gap-2 break-all"
+                                  >
+                                    <span className="text-gray-700 min-w-[6px]">
+                                      •
+                                    </span>{" "}
+                                    {q}
                                   </li>
                                 ))}
                               </ul>
@@ -498,10 +547,17 @@ export default function Home() {
 
                           {(scene.wardrobe || []).length > 0 && (
                             <div>
-                              <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">Wardrobe</span>
+                              <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">
+                                Wardrobe
+                              </span>
                               <div className="flex flex-wrap gap-2">
                                 {scene.wardrobe.map((w, idx) => (
-                                  <span key={idx} className="bg-purple-500/10 text-purple-300 px-2 py-1 rounded text-xs border border-purple-500/20">{w}</span>
+                                  <span
+                                    key={idx}
+                                    className="bg-purple-500/10 text-purple-300 px-2 py-1 rounded text-xs border border-purple-500/20"
+                                  >
+                                    {w}
+                                  </span>
                                 ))}
                               </div>
                             </div>
@@ -511,76 +567,114 @@ export default function Home() {
 
                       {/* ACTION & FX COLUMN */}
                       <div className="space-y-4 md:space-y-5">
-                         <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
+                        <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
                           <span className="text-lg">💥</span> Action
                         </h4>
                         <div className="space-y-4 text-sm">
                           {(scene.vfx || []).length > 0 && (
-                             <div className="bg-indigo-900/10 p-3 rounded border border-indigo-500/20">
-                               <span className="text-indigo-400 font-bold text-[10px] tracking-wider block mb-2">VFX SHOTS</span>
-                               <ul className="space-y-1">
-                                 {scene.vfx.map((v, i) => (
-                                   <li key={i} className="text-indigo-200 text-xs border-l-2 border-indigo-500/30 pl-2">{v}</li>
-                                 ))}
-                               </ul>
-                             </div>
+                            <div className="bg-indigo-900/10 p-3 rounded border border-indigo-500/20">
+                              <span className="text-indigo-400 font-bold text-[10px] tracking-wider block mb-2">
+                                VFX SHOTS
+                              </span>
+                              <ul className="space-y-1">
+                                {scene.vfx.map((v, i) => (
+                                  <li
+                                    key={i}
+                                    className="text-indigo-200 text-xs border-l-2 border-indigo-500/30 pl-2"
+                                  >
+                                    {v}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
-                          
+
                           {(scene.stunts || []).length > 0 && (
-                             <div className="bg-orange-900/10 p-3 rounded border border-orange-500/20">
-                               <span className="text-orange-400 font-bold text-[10px] tracking-wider block mb-2">STUNTS</span>
-                               <ul className="space-y-1">
-                                 {scene.stunts.map((st, i) => (
-                                   <li key={i} className="text-orange-200 text-xs border-l-2 border-orange-500/30 pl-2">{st}</li>
-                                 ))}
-                               </ul>
-                             </div>
+                            <div className="bg-orange-900/10 p-3 rounded border border-orange-500/20">
+                              <span className="text-orange-400 font-bold text-[10px] tracking-wider block mb-2">
+                                STUNTS
+                              </span>
+                              <ul className="space-y-1">
+                                {scene.stunts.map((st, i) => (
+                                  <li
+                                    key={i}
+                                    className="text-orange-200 text-xs border-l-2 border-orange-500/30 pl-2"
+                                  >
+                                    {st}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
 
                           {(scene.vehicles || []).length > 0 && (
-                             <div>
-                               <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">Vehicles</span>
-                               <div className="flex flex-wrap gap-2">
-                                 {scene.vehicles.map((v, idx) => (
-                                  <span key={idx} className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs border border-slate-700">{v}</span>
+                            <div>
+                              <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider block mb-2">
+                                Vehicles
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {scene.vehicles.map((v, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs border border-slate-700"
+                                  >
+                                    {v}
+                                  </span>
                                 ))}
-                               </div>
-                             </div>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
 
                       {/* PRODUCTION NOTES COLUMN */}
                       <div className="space-y-4 md:space-y-5">
-                         <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
+                        <h4 className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800 pb-2">
                           <span className="text-lg">📋</span> Production
                         </h4>
                         <div className="space-y-4 text-sm">
-                          
                           <div className="grid grid-cols-2 gap-4">
-                             {scene.prod_location && (
+                            {scene.prod_location && (
                               <div className="bg-white/5 p-2 rounded text-center border border-white/5">
-                                <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Location</span>
-                                <span className="text-gray-200 font-semibold block truncate text-xs md:text-sm" title={scene.prod_location}>{scene.prod_location}</span>
+                                <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">
+                                  Location
+                                </span>
+                                <span
+                                  className="text-gray-200 font-semibold block truncate text-xs md:text-sm"
+                                  title={scene.prod_location}
+                                >
+                                  {scene.prod_location}
+                                </span>
                               </div>
                             )}
                             {scene.scene_length && (
                               <div className="bg-white/5 p-2 rounded text-center border border-white/5">
-                                <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Duration</span>
-                                <span className="text-emerald-400 font-mono block text-xs md:text-sm">{scene.scene_length}</span>
+                                <span className="text-[10px] text-gray-500 font-bold uppercase block mb-1">
+                                  Duration
+                                </span>
+                                <span className="text-emerald-400 font-mono block text-xs md:text-sm">
+                                  {scene.scene_length}
+                                </span>
                               </div>
                             )}
                           </div>
 
                           {(scene.additional_scheduling || []).length > 0 && (
                             <div>
-                              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">Notes</span>
+                              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
+                                Notes
+                              </span>
                               <ul className="space-y-2">
-                                 {scene.additional_scheduling.map((note, idx) => (
-                                  <li key={idx} className="text-yellow-500/80 text-xs italic bg-yellow-900/5 p-2 rounded border border-yellow-900/10">
-                                    " {note} "
-                                  </li>
-                                ))}
+                                {scene.additional_scheduling.map(
+                                  (note, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-yellow-500/80 text-xs italic bg-yellow-900/5 p-2 rounded border border-yellow-900/10"
+                                    >
+                                      " {note} "
+                                    </li>
+                                  )
+                                )}
                               </ul>
                             </div>
                           )}
@@ -614,11 +708,11 @@ export default function Home() {
       {isGuideOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
           {/* Backdrop */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/80 backdrop-blur-md"
             onClick={() => setIsGuideOpen(false)}
           ></div>
-          
+
           {/* Modal Container */}
           <div className="relative w-full max-w-4xl max-h-[90vh] glass-panel rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-300">
             {/* Modal Header */}
@@ -626,19 +720,30 @@ export default function Home() {
               <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
                 <span className="text-emerald-500">📖</span> USER MANUAL
               </h2>
-              <button 
+              <button
                 onClick={() => setIsGuideOpen(false)}
                 className="p-2 hover:bg-white/5 rounded-full transition-colors group cursor-pointer"
               >
-                <svg className="w-6 h-6 text-gray-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                <svg
+                  className="w-6 h-6 text-gray-500 group-hover:text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  ></path>
                 </svg>
               </button>
             </div>
-            
+
             {/* Modal Content */}
             <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar">
-              <div className="prose prose-invert prose-emerald max-w-none 
+              <div
+                className="prose prose-invert prose-emerald max-w-none 
                 prose-headings:font-black prose-headings:tracking-tight prose-headings:uppercase 
                 prose-h1:text-3xl prose-h1:mb-8 prose-h1:text-transparent prose-h1:bg-clip-text prose-h1:bg-gradient-to-r prose-h1:from-emerald-400 prose-h1:to-teal-200
                 prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:border-b prose-h2:border-white/5 prose-h2:pb-2
@@ -652,16 +757,17 @@ export default function Home() {
                 prose-table:border prose-table:border-white/5 prose-table:rounded-xl prose-table:overflow-hidden
                 prose-th:bg-white/5 prose-th:px-4 prose-th:py-3 prose-th:text-xs prose-th:font-bold prose-th:text-gray-500 prose-th:uppercase prose-th:tracking-wider
                 prose-td:px-4 prose-td:py-3 prose-td:border-t prose-td:border-white/5 prose-td:text-sm
-              ">
+              "
+              >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {README_CONTENT}
                 </ReactMarkdown>
               </div>
             </div>
-            
+
             {/* Modal Footer */}
             <div className="bg-black/40 px-6 py-4 border-t border-white/5 text-center">
-              <button 
+              <button
                 onClick={() => setIsGuideOpen(false)}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-2 rounded-xl font-bold transition-all cursor-pointer"
               >
