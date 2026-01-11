@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("Line 123>>>script final data to be annotate", scriptDatas);
+    // console.log("Line 123>>>script final data to be annotate", scriptDatas);
 
     await highlightEntities(docId, scriptDatas);
 

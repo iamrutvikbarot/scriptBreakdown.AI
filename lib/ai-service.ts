@@ -89,10 +89,11 @@ export function parseLLMJson(data: any) {
 
 export async function analyzeScript(
   text: string,
-  sceneIndex: number = 1
+  sceneIndex: number = 1,
+  apiKey?: string
 ): Promise<ScriptData> {
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY!,
+    apiKey: apiKey || process.env.GEMINI_API_KEY!,
   });
 
   const prompt = `Return ONLY a valid JSON array.

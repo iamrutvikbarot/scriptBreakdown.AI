@@ -1,43 +1,52 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "./components/ToastProvider";
 
+interface Annotation {
+  text: string;
+  category: string;
+}
+
+interface ProcessedScene {
+  scene_number: number;
+  int_ext: string;
+  scene_location: string;
+  prod_location: string;
+  time_of_day: string;
+  scene_transition: string;
+  scene_summary: string;
+
+  props: string[];
+  item_quantity: string[];
+  wardrobe: string[];
+  set_dec: string[];
+  vehicles: string[];
+  stunts: string[];
+  sfx: string[];
+  vfx: string[];
+
+  actors: string[];
+  non_speaking_roles: string[];
+
+  cast_details: {
+    age: string[];
+    build: string[];
+    ethnicity: string[];
+    gender: string[];
+  };
+
+  makeup: string[];
+  scene_length: string;
+  additional_scheduling: string[];
+  breakdown_name: string;
+}
+
 interface ScriptData {
-  scenes: {
-    scene_number: number;
-    int_ext: "INT" | "EXT" | "";
-    scene_location: string;
-    prod_location: string;
-    time_of_day: string;
-    scene_transition: string;
-    scene_summary: string;
-
-    props: string[];
-    item_quantity: string[];
-    wardrobe: string[];
-    set_dec: string[];
-    vehicles: string[];
-    stunts: string[];
-    sfx: string[];
-    vfx: string[];
-
-    actors: string[];
-    non_speaking_roles: string[];
-
-    cast_details: {
-      age: string[];
-      build: string[];
-      ethnicity: string[];
-      gender: string[];
-    };
-
-    makeup: string[];
-    scene_length: string;
-    additional_scheduling: string[];
-    breakdown_name: string;
-  }[];
+  success: boolean;
+  sceneCount: number;
+  results: Annotation[][];
 }
 
 const README_CONTENT = `# SCRIPTBREAKDOWN.AI - User Guide & Integration Guide
@@ -119,10 +128,17 @@ export default function Home() {
   const [provider, setProvider] = useState("nvidia");
 
   const [docUrl, setDocUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
 
   // Progress State
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  // Load API Key from localStorage
+  useEffect(() => {
+    const savedKey = localStorage.getItem("gemini_api_key");
+    if (savedKey) setApiKey(savedKey);
+  }, []);
 
   const triggerAutoAnnotation = async (docId: string, data: any) => {
     try {
@@ -154,6 +170,7 @@ export default function Home() {
       provider: "nvidia",
       stream: true,
       fileUrl: docUrl,
+      apiKey: apiKey || undefined,
     };
 
     try {
@@ -172,6 +189,7 @@ export default function Home() {
 
       const text = await res.text();
       const data = JSON.parse(text);
+      setResult(data);
 
       // After streaming is complete, trigger auto-annotation if applicable
       if (docUrl) {
@@ -188,10 +206,127 @@ export default function Home() {
     setLoading(false);
   };
 
+  const transformResults = (results: Annotation[][]): ProcessedScene[] => {
+    return results.map((sceneTokens, index) => {
+      const scene: ProcessedScene = {
+        scene_number: index + 1,
+        int_ext: "",
+        scene_location: "",
+        prod_location: "",
+        time_of_day: "",
+        scene_transition: "",
+        scene_summary: "",
+        props: [],
+        item_quantity: [],
+        wardrobe: [],
+        set_dec: [],
+        vehicles: [],
+        stunts: [],
+        sfx: [],
+        vfx: [],
+        actors: [],
+        non_speaking_roles: [],
+        cast_details: {
+          age: [],
+          build: [],
+          ethnicity: [],
+          gender: [],
+        },
+        makeup: [],
+        additional_scheduling: [],
+        breakdown_name: "",
+        scene_length: "",
+      };
+
+      sceneTokens.forEach(({ text, category }) => {
+        switch (category) {
+          case "INT_EXT":
+            scene.int_ext = text;
+            break;
+          case "LOCATION":
+            scene.scene_location = text;
+            break;
+          case "TIME":
+            scene.time_of_day = text;
+            break;
+          case "TRANSITION":
+            scene.scene_transition = text;
+            break;
+          case "PROD_LOC":
+            scene.prod_location = text;
+            break;
+          case "ACTOR":
+            if (!scene.actors.includes(text)) scene.actors.push(text);
+            break;
+          case "NON_SPEAKING":
+            if (!scene.non_speaking_roles.includes(text))
+              scene.non_speaking_roles.push(text);
+            break;
+          case "PROP":
+            if (!scene.props.includes(text)) scene.props.push(text);
+            break;
+          case "QUANTITY":
+            scene.item_quantity.push(text);
+            break;
+          case "WARDROBE":
+            if (!scene.wardrobe.includes(text)) scene.wardrobe.push(text);
+            break;
+          case "SET_DEC":
+            if (!scene.set_dec.includes(text)) scene.set_dec.push(text);
+            break;
+          case "VEHICLE":
+            if (!scene.vehicles.includes(text)) scene.vehicles.push(text);
+            break;
+          case "STUNT":
+            if (!scene.stunts.includes(text)) scene.stunts.push(text);
+            break;
+          case "SFX":
+            if (!scene.sfx.includes(text)) scene.sfx.push(text);
+            break;
+          case "VFX":
+            if (!scene.vfx.includes(text)) scene.vfx.push(text);
+            break;
+          case "AGE":
+            if (!scene.cast_details.age.includes(text))
+              scene.cast_details.age.push(text);
+            break;
+          case "GENDER":
+            if (!scene.cast_details.gender.includes(text))
+              scene.cast_details.gender.push(text);
+            break;
+          case "BUILD":
+            if (!scene.cast_details.build.includes(text))
+              scene.cast_details.build.push(text);
+            break;
+          case "ETHNICITY":
+            if (!scene.cast_details.ethnicity.includes(text))
+              scene.cast_details.ethnicity.push(text);
+            break;
+          case "MAKEUP":
+            if (!scene.makeup.includes(text)) scene.makeup.push(text);
+            break;
+          case "NOTE":
+            scene.additional_scheduling.push(text);
+            break;
+          case "ID":
+            scene.breakdown_name = text;
+            break;
+          case "SCENE_HEADER":
+            if (!scene.scene_location) scene.scene_location = text;
+            break;
+        }
+      });
+
+      return scene;
+    });
+  };
+
   const progressPercentage =
     progress.total > 0
       ? Math.min(100, Math.round((progress.current / progress.total) * 100))
       : 0;
+
+  const processedScenes = result ? transformResults(result.results) : [];
 
   return (
     <main className="min-h-screen text-gray-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-100 overflow-x-hidden flex flex-col">
@@ -311,11 +446,36 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+
+                <div className="w-full max-w-lg space-y-3 px-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">
+                      Gemini API Key (Optional)
+                    </label>
+                    <span className="text-[10px] text-gray-600 font-mono uppercase">
+                      Stored Locally
+                    </span>
+                  </div>
+                  <input
+                    type="password"
+                    className="glass-input w-full text-gray-200 p-3 md:p-4 rounded-xl focus:outline-none font-mono text-sm placeholder-gray-600"
+                    placeholder="Enter your Gemini API Key..."
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      localStorage.setItem("gemini_api_key", e.target.value);
+                    }}
+                  />
+                  <p className="text-[10px] text-gray-500 ml-1">
+                    If provided, this key will be used instead of the default
+                    server key.
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/5 gap-4">
-                <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1">
-                  AI MODEL: NVIDIA LLAMA-3.1-70B
+                <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1 capitalize">
+                  AI MODEL: gemini-2.5-flash
                 </div>
                 {loading ? (
                   <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
@@ -378,13 +538,13 @@ export default function Home() {
               <div className="flex items-center gap-4 self-start md:self-auto">
                 {/* Auto-Sync is now active, no button needed */}
                 <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md">
-                  {result.scenes?.length || 0} SCENES EXTRACTED
+                  {processedScenes.length} SCENES EXTRACTED
                 </span>
               </div>
             </div>
 
             <div className="grid gap-6 md:gap-8">
-              {(result.scenes || []).map((scene, i) => (
+              {processedScenes.map((scene, i) => (
                 <div
                   key={i}
                   className="glass-panel rounded-2xl overflow-hidden transition-all hover:border-gray-700 group mx-2 md:mx-0"

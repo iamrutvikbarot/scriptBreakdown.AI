@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { fileUrl } = await req.json();
+    const { fileUrl, apiKey } = await req.json();
 
     if (!fileUrl) {
       return NextResponse.json(
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     const results = [];
 
     for (const scene of scenes) {
-      const analysis = await analyzeScript(scene);
+      const analysis = await analyzeScript(scene, 1, apiKey);
       results.push(analysis);
     }
 
