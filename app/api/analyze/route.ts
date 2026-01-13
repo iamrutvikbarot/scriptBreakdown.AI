@@ -3,6 +3,32 @@ import { extractTextFromGoogleDoc } from "@/lib/google-docs";
 import { splitScriptIntoScenes } from "@/lib/script-splitter";
 import { NextResponse } from "next/server";
 
+function splitIntoParagraphs(text: string): string[][] {
+  const splitted: string[] = text
+    .split(/\n\s*\n/) // split on blank lines
+    .map((p: string) => p.trim())
+    .filter(Boolean); // remove empty paragraphs
+
+  const arr: string[][] = [];
+  let chunk: string[] = [];
+
+  for (const paragraph of splitted) {
+    chunk.push(paragraph);
+
+    if (chunk.length === 10) {
+      arr.push(chunk);
+      chunk = [];
+    }
+  }
+
+  // push remaining paragraphs
+  if (chunk.length > 0) {
+    arr.push(chunk);
+  }
+
+  return arr;
+}
+
 export async function POST(req: Request) {
   try {
     const { fileUrl, apiKey } = await req.json();
@@ -39,19 +65,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Split into scenes
-    const scenes = splitScriptIntoScenes(scriptText);
+    const result = splitIntoParagraphs(scriptText);
 
     const results = [];
 
-    for (const scene of scenes) {
-      const analysis = await analyzeScript(scene, 1, apiKey);
+    for (const chunk in result) {
+      let text = result[chunk].join("\n");
+      const analysis = await analyzeScript(text, apiKey);
       results.push(analysis);
     }
 
     return NextResponse.json({
       success: true,
-      sceneCount: scenes.length,
       results,
     });
   } catch (error) {
