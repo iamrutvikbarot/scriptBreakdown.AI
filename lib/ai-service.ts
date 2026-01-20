@@ -68,7 +68,7 @@ async function generateWithRetry(
   }
 }
 
-export function parseLLMJson(data: any) {
+export function parseLLMJson(data: string) {
   if (data === "") {
     throw new Error("AI response not available.");
   }
@@ -89,7 +89,6 @@ export function parseLLMJson(data: any) {
 
 export async function analyzeScript(
   text: string,
-  sceneIndex: number = 1,
   apiKey?: string
 ): Promise<ScriptData> {
   const ai = new GoogleGenAI({
@@ -97,53 +96,57 @@ export async function analyzeScript(
   });
 
   const prompt = `Return ONLY a valid JSON array.
-            Each item must contain:
-            - text
-            - category
+                  Each item must contain:
+                  - text
+                  - category
 
-            Allowed categories ONLY:
-            SCENE_HEADER, TRANSITION, TIME, LOCATION, PROD_LOC,
-            ACTOR, NON_SPEAKING, AGE, BUILD, ETHNICITY, GENDER,
-            MAKEUP, PROP, QUANTITY, WARDROBE, SFX, VFX, SET_DEC,
-            STUNT, VEHICLE, NOTE, ID, INT_EXT
+                  Allowed categories ONLY:
+                  SCENE_HEADER, TRANSITION, TIME, LOCATION, PROD_LOC,
+                  ACTOR, NON_SPEAKING, AGE, BUILD, ETHNICITY, GENDER,
+                  MAKEUP, PROP, QUANTITY, WARDROBE, SFX, VFX, SET_DEC,
+                  STUNT, VEHICLE, NOTE, ID, INT_EXT
 
-            RULES:
-            1. Any full scene line like:
-              "EXT. - STREET - DAY",
-              "INT. - HOSPITAL ROOM - NIGHT",
-              "CUT TO - SCENE 1 - YEARS EARLIER"
-              MUST be returned as SCENE_HEADER (entire line).
+                  RULES:
+                  Scene starts with "Ex: Format Check | Test by Color and RB" where "Test by Color and RB" should always considered as SCENE_HEADER. 
 
-            2. Also extract scene parts separately:
-              INT./EXT. → INT_EXT
-              Location → LOCATION
-              Time → TIME
-              Scene numbers → ID
+                  1. Any full scene line like:
+                    "EXT. - STREET - DAY",
+                    "INT. - HOSPITAL ROOM - NIGHT",
+                    "CUT TO - SCENE 1 - YEARS EARLIER"
+                    MUST be returned as SCENE_HEADER (entire line).
 
-            3. Script starts with "Note:" then the whole paragraph should considered as [NOTE] category
+                  2. Also extract scene parts separately:
+                    INT./EXT. → INT_EXT
+                    Location → LOCATION
+                    Time → TIME
+                    Scene numbers → ID
 
-            4. If text appears inside parentheses "( )",
-              return the text WITH brackets and categorize correctly.
+                  3. Script starts with "Note:" then the whole paragraph should considered as "NOTE" category
 
-            5. Character names in CAPS → ACTOR.
-              Unnamed groups (e.g. GIRLS 1-2) → NON_SPEAKING.
+                  4. If text appears inside parentheses "( )",
+                    return the text WITH brackets and categorize correctly.
 
-            6. Camera directions → VFX.
-              Transitions → TRANSITION.
-              Sounds → SFX.
+                  5. Character names in CAPS → ACTOR.
+                    Unnamed groups (e.g. GIRLS 1-2) → NON_SPEAKING.
 
-            7. Objects → PROP.
-              Vehicles → VEHICLE.
-              Furniture/room items → SET_DEC.
+                  6. Camera directions → VFX.
+                    Transitions → TRANSITION.
+                    Sounds → SFX.
 
-            8. Preserve order. Do not invent or omit items.
+                  7. Objects → PROP.
+                    Vehicles → VEHICLE.
+                    Furniture/room items → SET_DEC.
 
-            Script:
-            ${text}
-            `;
+                  8. Preserve order. Do not invent or omit items.
+                  Note: Do not get single character or symbols (Ex: ".", "..." etc.)
+                  always get whole word. Ex: "Hello", "Girl" etc.
+
+                  Script:
+                  ${text}
+                  `;
 
   const completion = await generateWithRetry(ai, {
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
 

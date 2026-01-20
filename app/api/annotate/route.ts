@@ -1,128 +1,54 @@
 import { highlightEntities } from "@/lib/google-docs";
 import { NextResponse } from "next/server";
 
-function transformScene(
-  data: Array<{ text: string; category: string }>,
-  sceneNumber: number
-) {
-  const actors: string[] = [];
-  const props: string[] = [];
-  const wardrobe: string[] = [];
-  const vehicles: string[] = [];
-  const vfx: string[] = [];
-  const sfx: string[] = [];
-  const setDec: string[] = [];
-  const additionalScheduling: string[] = [];
-  const nonSpeakingRoles: string[] = [];
-
-  const castDetails = {
-    age: [] as string[],
-    gender: [] as string[],
-    build: [] as string[],
-    ethnicity: [] as string[],
-  };
-
-  let intExt: "" | "INT" | "EXT" = "";
-  let sceneLocation = "";
-  let timeOfDay = "";
-  let sceneTransition = "";
-
-  data.forEach(({ text, category }) => {
-    switch (category) {
-      case "ACTOR":
-        actors.push(text);
-        break;
-      case "PROP":
-        props.push(text);
-        break;
-      case "WARDROBE":
-        wardrobe.push(text);
-        break;
-      case "VEHICLE":
-        vehicles.push(text);
-        break;
-      case "VFX":
-        vfx.push(text);
-        break;
-      case "SFX":
-        sfx.push(text);
-        break;
-      case "SET_DEC":
-        setDec.push(text);
-        break;
-      case "INT_EXT":
-        intExt = text as "INT" | "EXT";
-        break;
-      case "LOCATION":
-        sceneLocation = text;
-        break;
-      case "TIME":
-        timeOfDay = text;
-        break;
-      case "TRANSITION":
-        sceneTransition = text;
-        break;
-      case "AGE":
-        castDetails.age.push(text);
-        break;
-      case "GENDER":
-        castDetails.gender.push(text);
-        break;
-      case "NON_SPEAKING":
-        nonSpeakingRoles.push(text);
-        break;
-      case "NOTE":
-        additionalScheduling.push(text);
-        break;
-    }
-  });
-
-  return {
-    scene_number: sceneNumber,
-    int_ext: intExt,
-    scene_location: sceneLocation,
-    prod_location: "",
-    time_of_day: timeOfDay,
-    scene_transition: sceneTransition,
-    scene_summary: "",
-    props,
-    item_quantity: [],
-    actors,
-    non_speaking_roles: nonSpeakingRoles,
-    wardrobe,
-    set_dec: setDec,
-    vehicles,
-    stunts: [],
-    sfx,
-    vfx,
-    makeup: [],
-    additional_scheduling: additionalScheduling,
-    cast_details: castDetails,
-    breakdown_name: "",
-    scene_length: "",
-  };
-}
+const CATEGORY_COLORS = {
+  SCENE_HEADER: "#fff2cc",
+  TRANSITION: "#9900ff",
+  TIME: "#f4cccc",
+  LOCATION: "#c9daf8",
+  PROD_LOC: "#d59f69",
+  ACTOR: "#00ff00",
+  NON_SPEAKING: "#b6d7a8",
+  AGE: "#fce5cd",
+  BUILD: "#d0e0e3",
+  ETHNICITY: "#980000",
+  GENDER: "#e6b8af",
+  MAKEUP: "#ff00ff",
+  PROP: "#ffff00",
+  QUANTITY: "#0000ff",
+  WARDROBE: "#ead1dc",
+  SFX: "#cfe2f3",
+  VFX: "#00ffff",
+  SET_DEC: "#d9d2e9",
+  STUNT: "#ff9900",
+  VEHICLE: "#4a86e8",
+  NOTE: "#ff0000",
+  ID: "#ea9999",
+  INT_EXT: "#b4a7d6",
+};
 
 export async function POST(req: Request) {
   try {
     const { docId, scriptData } = await req.json();
 
-    const scenes = scriptData.map((sceneTokens: any, index: number) =>
-      transformScene(sceneTokens, index + 1)
-    );
+    const scenes = scriptData?.flat();
 
-    const scriptDatas = { scenes };
-
-    if (!docId || !scriptDatas) {
+    if (!docId || !scenes) {
       return NextResponse.json(
         { error: "Missing docId or scriptData" },
         { status: 400 }
       );
     }
 
+    const fullItems = scenes.map((item: any) => ({
+      text: item.text,
+      category: item.category,
+      bgColor: CATEGORY_COLORS[item.category as keyof typeof CATEGORY_COLORS],
+    }));
+
     // console.log("Line 123>>>script final data to be annotate", scriptDatas);
 
-    await highlightEntities(docId, scriptDatas);
+    await highlightEntities(docId, fullItems);
 
     return NextResponse.json({ success: true, message: "Annotation complete" });
   } catch (error) {
