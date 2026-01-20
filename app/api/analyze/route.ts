@@ -14,7 +14,7 @@ function splitIntoParagraphs(text: string): string[][] {
   for (const paragraph of splitted) {
     chunk.push(paragraph);
 
-    if (chunk.length === 5) {
+    if (chunk.length === 10) {
       arr.push(chunk);
       chunk = [];
     }

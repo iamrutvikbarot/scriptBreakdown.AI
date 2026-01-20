@@ -637,13 +637,13 @@ export default function Home() {
 
               <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/5 gap-4">
                 <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1 capitalize">
-                  AI MODEL: gemini-2.5-flash
+                  AI MODEL: gemini-3-flash-preview
                 </div>
                 {loading ? (
                   <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
                     <div className="flex justify-between text-xs font-mono text-emerald-400">
                       <span>
-                        ANALYZING SCENE {progress.current} /{" "}
+                        ANALYZING DATA {progress.current} /{" "}
                         {progress.total > 0 ? progress.total : "..."}
                       </span>
                       <span>{progressPercentage}%</span>
@@ -700,7 +700,7 @@ export default function Home() {
               <div className="flex items-center gap-4 self-start md:self-auto">
                 {/* Auto-Sync is now active, no button needed */}
                 <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md">
-                  {processedScenes.length} SCENES EXTRACTED
+                  {processedScenes.length} DATA EXTRACTED
                 </span>
               </div>
             </div>
