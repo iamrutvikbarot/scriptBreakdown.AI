@@ -1,13 +1,12 @@
 import { analyzeScript } from "@/lib/ai-service";
 import { extractTextFromGoogleDoc } from "@/lib/google-docs";
-import { splitScriptIntoScenes } from "@/lib/script-splitter";
 import { NextResponse } from "next/server";
 
 function splitIntoParagraphs(text: string): string[][] {
   const splitted: string[] = text
     .split(/\n\s*\n/) // split on blank lines
     .map((p: string) => p.trim())
-    .filter(Boolean); // remove empty paragraphs
+    .filter(Boolean);
 
   const arr: string[][] = [];
   let chunk: string[] = [];
@@ -15,13 +14,12 @@ function splitIntoParagraphs(text: string): string[][] {
   for (const paragraph of splitted) {
     chunk.push(paragraph);
 
-    if (chunk.length === 10) {
+    if (chunk.length === 5) {
       arr.push(chunk);
       chunk = [];
     }
   }
 
-  // push remaining paragraphs
   if (chunk.length > 0) {
     arr.push(chunk);
   }
@@ -36,14 +34,14 @@ export async function POST(req: Request) {
     if (!fileUrl) {
       return NextResponse.json(
         { success: false, error: "No Google Doc URL provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!fileUrl.includes("docs.google.com")) {
       return NextResponse.json(
         { success: false, error: "Invalid Google Doc URL" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,36 +52,89 @@ export async function POST(req: Request) {
       console.error("Google Doc Extraction Failed:", error);
       return NextResponse.json(
         { success: false, error: "Failed to read Google Doc" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!scriptText) {
       return NextResponse.json(
         { success: false, error: "No script text found in document" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const result = splitIntoParagraphs(scriptText);
+    const chunks = splitIntoParagraphs(scriptText);
 
-    const results = [];
+    const encoder = new TextEncoder();
 
-    for (const chunk in result) {
-      let text = result[chunk].join("\n");
-      const analysis = await analyzeScript(text, apiKey);
-      results.push(analysis);
-    }
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendEvent = (event: string, data: any) => {
+          controller.enqueue(
+            encoder.encode(
+              `event: ${event}\n` + `data: ${JSON.stringify(data)}\n\n`,
+            ),
+          );
+        };
 
-    return NextResponse.json({
-      success: true,
-      results,
+        try {
+          // Initial message
+          sendEvent("start", {
+            success: true,
+            totalChunks: chunks.length,
+            message: "Streaming analysis started...",
+          });
+
+          // Stream each analyzeScript response
+          for (let i = 0; i < chunks.length; i++) {
+            const text = chunks[i].join("\n");
+
+            sendEvent("progress", {
+              chunkIndex: i,
+              status: "analyzing",
+              message: `Analyzing chunk ${i + 1}/${chunks.length}`,
+            });
+
+            const analysis = await analyzeScript(text, apiKey);
+
+            sendEvent("chunk", {
+              chunkIndex: i,
+              analysis,
+            });
+          }
+
+          // Final message
+          sendEvent("done", {
+            success: true,
+            message: "All chunks analyzed successfully.",
+          });
+
+          controller.close();
+        } catch (err: any) {
+          console.error("Streaming Error:", err);
+
+          sendEvent("error", {
+            success: false,
+            message: err?.message || "AI Failed",
+          });
+
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
       { success: false, error: "AI Failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
