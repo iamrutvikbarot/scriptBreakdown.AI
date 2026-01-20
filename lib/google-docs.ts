@@ -7,8 +7,8 @@ import { google, docs_v1 } from "googleapis";
 
 const auth = new google.auth.GoogleAuth({
   credentials: {
-    client_email: process.env.googleClientEmail as string,
-    private_key: process.env.googlePrivateKey?.replace(/\\n/g, "\n"),
+    client_email: process.env.GOOGLE_CLIENT_EMAIL as string,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
   },
   scopes: [
     "https://www.googleapis.com/auth/drive",
@@ -58,7 +58,7 @@ function hexToRgbColor(hex: string): RgbColor {
 
 export async function highlightEntities(
   docId: string,
-  items: HighlightItem[]
+  items: HighlightItem[],
 ): Promise<void> {
   try {
     const doc = await docs.documents.get({ documentId: docId });
@@ -167,7 +167,7 @@ export async function extractTextFromGoogleDoc(url: string): Promise<string> {
   } catch (error) {
     console.error("Failed to read Google Doc:", error);
     throw new Error(
-      "Could not access Google Doc. Check permissions (share with service account)."
+      "Could not access Google Doc. Check permissions (share with service account).",
     );
   }
 }
