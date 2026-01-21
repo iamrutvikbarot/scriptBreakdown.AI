@@ -9,6 +9,44 @@ interface Annotation {
   category: string;
 }
 
+interface Annotation {
+  text: string;
+  category: string;
+}
+
+interface ScriptData {
+  success: boolean;
+  sceneCount: number;
+  results: Annotation[][];
+}
+
+type SSEStart = {
+  success: boolean;
+  totalChunks: number;
+  message?: string;
+};
+
+type SSEProgress = {
+  chunkIndex: number;
+  status?: string;
+  message?: string;
+};
+
+type SSEChunk = {
+  chunkIndex: number;
+  analysis: Annotation[];
+};
+
+type SSEDone = {
+  success: boolean;
+  message?: string;
+};
+
+type SSEError = {
+  success: boolean;
+  message: string;
+};
+
 interface ProcessedScene {
   scene_number: number;
   int_ext: string;
@@ -162,19 +200,21 @@ export default function Home() {
 
   const handleAnalyze = async () => {
     if (!docUrl) return;
+
     setLoading(true);
     setResult(null);
     setProgress({ current: 0, total: 0 });
 
-    const payload: any = {
+    const payload = {
       provider: "nvidia",
       stream: true,
       fileUrl: docUrl,
       apiKey: apiKey || undefined,
     };
 
+    const finalResults: Annotation[][] = [];
+
     try {
-      // No need to pre-extract; the API handles it
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,28 +222,150 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error(res.statusText + (await res.text()));
+        throw new Error(res.statusText + " " + (await res.text()));
       }
 
       if (!res.body) throw new Error("No response body");
 
-      const text = await res.text();
-      const data = JSON.parse(text);
-      setResult(data);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
 
-      // After streaming is complete, trigger auto-annotation if applicable
-      if (docUrl) {
-        const docIdMatch = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (docIdMatch && docIdMatch[1]) {
-          triggerAutoAnnotation(docIdMatch[1], data?.results);
-        } else {
-          console.warn("Could not extract docId from URL for auto-annotation.");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE event blocks separated by "\n\n"
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() || "";
+
+        for (const block of blocks) {
+          const lines = block.split("\n").filter(Boolean);
+
+          let eventName = "";
+          let dataStr = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventName = line.replace("event:", "").trim();
+            } else if (line.startsWith("data:")) {
+              dataStr += line.replace("data:", "").trim();
+            }
+          }
+
+          if (!eventName || !dataStr) continue;
+
+          let parsedData: unknown;
+          try {
+            parsedData = JSON.parse(dataStr);
+          } catch (err) {
+            console.error("❌ SSE JSON parse error:", err, dataStr);
+            continue;
+          }
+
+          // START
+          if (eventName === "start") {
+            const startData = parsedData as SSEStart;
+
+            setProgress({
+              current: 0,
+              total: startData.totalChunks || 0,
+            });
+
+            // Optional: show empty structure immediately
+            setResult({
+              success: true,
+              sceneCount: 0,
+              results: [],
+            });
+          }
+
+          // PROGRESS (optional - only show "processing", don't mark completed)
+          if (eventName === "progress") {
+            const progressData = parsedData as SSEProgress;
+
+            // Don't update current here, because chunk isn't completed yet
+            // You can optionally store "processingIndex" if you want
+            console.log("Processing chunk:", progressData.chunkIndex + 1);
+          }
+
+          // CHUNK (this means COMPLETED)
+          if (eventName === "chunk") {
+            const chunkData = parsedData as SSEChunk;
+
+            finalResults[chunkData.chunkIndex] = chunkData.analysis;
+
+            const completedChunks = finalResults.filter(Boolean).length;
+
+            const sceneCount = finalResults.reduce(
+              (acc, chunk) => acc + (chunk?.length || 0),
+              0,
+            );
+
+            const liveData: ScriptData = {
+              success: true,
+              sceneCount,
+              results: [...finalResults],
+            };
+
+            setResult(liveData);
+
+            // THIS IS THE IMPORTANT PART
+            // progress.current means COMPLETED chunks
+            setProgress((prev) => ({
+              ...prev,
+              current: completedChunks,
+            }));
+          }
+
+          // DONE
+          if (eventName === "done") {
+            const doneData = parsedData as SSEDone;
+
+            const sceneCount = finalResults.reduce(
+              (acc, chunk) => acc + (chunk?.length || 0),
+              0,
+            );
+
+            const finalData: ScriptData = {
+              success: true,
+              sceneCount,
+              results: finalResults,
+            };
+
+            setResult(finalData);
+
+            // Trigger auto annotation AFTER streaming is complete
+            if (docUrl) {
+              const docIdMatch = docUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+              if (docIdMatch?.[1]) {
+                triggerAutoAnnotation(docIdMatch[1], finalData.results);
+              } else {
+                console.warn(
+                  "Could not extract docId from URL for auto-annotation.",
+                );
+              }
+            }
+
+            console.log("Stream completed:", doneData.message || "done");
+          }
+
+          // ❌ ERROR
+          if (eventName === "error") {
+            const errData = parsedData as SSEError;
+            throw new Error(errData.message || "Streaming failed");
+          }
         }
       }
-    } catch (e) {
-      showToast("Error processing script: " + e, "error");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      showToast("Error processing script: " + message, "error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const transformResults = (results: Annotation[][]): ProcessedScene[] => {
@@ -421,7 +583,7 @@ export default function Home() {
                       className="glass-panel px-3 py-2 rounded-lg flex items-center justify-between group cursor-pointer bg-black/20 hover:bg-black/40 transition-colors"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          "breakdown-ai@brack-down-ai.iam.gserviceaccount.com"
+                          "breakdown-ai@brack-down-ai.iam.gserviceaccount.com",
                         );
                         showToast("Email copied to clipboard!", "success");
                       }}
@@ -475,13 +637,13 @@ export default function Home() {
 
               <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/5 gap-4">
                 <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1 capitalize">
-                  AI MODEL: gemini-2.5-flash
+                  AI MODEL: gemini-3-flash-preview
                 </div>
                 {loading ? (
                   <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
                     <div className="flex justify-between text-xs font-mono text-emerald-400">
                       <span>
-                        ANALYZING SCENE {progress.current} /{" "}
+                        ANALYZING DATA {progress.current} /{" "}
                         {progress.total > 0 ? progress.total : "..."}
                       </span>
                       <span>{progressPercentage}%</span>
@@ -538,7 +700,7 @@ export default function Home() {
               <div className="flex items-center gap-4 self-start md:self-auto">
                 {/* Auto-Sync is now active, no button needed */}
                 <span className="glass-panel px-4 py-1.5 rounded-full text-emerald-400 font-mono text-xs font-bold shadow-lg shadow-emerald-900/20 backdrop-blur-md">
-                  {processedScenes.length} SCENES EXTRACTED
+                  {processedScenes.length} DATA EXTRACTED
                 </span>
               </div>
             </div>
@@ -833,7 +995,7 @@ export default function Home() {
                                     >
                                       " {note} "
                                     </li>
-                                  )
+                                  ),
                                 )}
                               </ul>
                             </div>
