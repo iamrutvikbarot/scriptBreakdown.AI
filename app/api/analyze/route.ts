@@ -1,31 +1,7 @@
 import { analyzeScript } from "@/lib/ai-service";
 import { extractTextFromGoogleDoc } from "@/lib/google-docs";
+import { splitScriptIntoScenes } from "@/lib/script-splitter";
 import { NextResponse } from "next/server";
-
-function splitIntoParagraphs(text: string): string[][] {
-  const splitted: string[] = text
-    .split(/\n\s*\n/) // split on blank lines
-    .map((p: string) => p.trim())
-    .filter(Boolean);
-
-  const arr: string[][] = [];
-  let chunk: string[] = [];
-
-  for (const paragraph of splitted) {
-    chunk.push(paragraph);
-
-    if (chunk.length === 10) {
-      arr.push(chunk);
-      chunk = [];
-    }
-  }
-
-  if (chunk.length > 0) {
-    arr.push(chunk);
-  }
-
-  return arr;
-}
 
 export async function POST(req: Request) {
   try {
@@ -63,7 +39,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const chunks = splitIntoParagraphs(scriptText);
+    const scenes = splitScriptIntoScenes(scriptText);
 
     const encoder = new TextEncoder();
 
@@ -81,18 +57,18 @@ export async function POST(req: Request) {
           // Initial message
           sendEvent("start", {
             success: true,
-            totalChunks: chunks.length,
+            totalChunks: scenes.length,
             message: "Streaming analysis started...",
           });
 
           // Stream each analyzeScript response
-          for (let i = 0; i < chunks.length; i++) {
-            const text = chunks[i].join("\n");
+          for (let i = 0; i < scenes.length; i++) {
+            const text = scenes[i];
 
             sendEvent("progress", {
               chunkIndex: i,
               status: "analyzing",
-              message: `Analyzing chunk ${i + 1}/${chunks.length}`,
+              message: `Analyzing chunk ${i + 1}/${scenes.length}`,
             });
 
             const analysis = await analyzeScript(text, apiKey);

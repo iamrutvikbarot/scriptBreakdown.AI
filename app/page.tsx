@@ -179,6 +179,8 @@ export default function Home() {
   }, []);
 
   const triggerAutoAnnotation = async (docId: string, data: any) => {
+    console.log("Line 183 annotation data", data);
+
     try {
       console.log("Triggering auto-annotation for doc:", docId);
       const res = await fetch("/api/annotate", {

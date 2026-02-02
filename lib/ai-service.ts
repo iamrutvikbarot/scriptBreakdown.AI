@@ -49,7 +49,7 @@ async function generateWithRetry(
   ai: any,
   payload: any,
   retries = 5,
-  delay = 1000
+  delay = 1000,
 ) {
   try {
     return await ai.models.generateContent(payload);
@@ -58,7 +58,7 @@ async function generateWithRetry(
 
     if (status === 503 && retries > 0) {
       console.warn(
-        `Gemini overloaded. Retrying in ${delay}ms... (${retries} left)`
+        `Gemini overloaded. Retrying in ${delay}ms... (${retries} left)`,
       );
       await new Promise((res) => setTimeout(res, delay));
       return generateWithRetry(ai, payload, retries - 1, delay * 2);
@@ -89,61 +89,75 @@ export function parseLLMJson(data: string) {
 
 export async function analyzeScript(
   text: string,
-  apiKey?: string
+  apiKey?: string,
 ): Promise<ScriptData> {
   const ai = new GoogleGenAI({
     apiKey: apiKey || process.env.GEMINI_API_KEY!,
   });
 
   const prompt = `Return ONLY a valid JSON array.
-                  Each item must contain:
-                  - text
-                  - category
+                    Each item must contain:
+                    - text
+                    - category
 
-                  Allowed categories ONLY:
-                  SCENE_HEADER, TRANSITION, TIME, LOCATION, PROD_LOC,
-                  ACTOR, NON_SPEAKING, AGE, BUILD, ETHNICITY, GENDER,
-                  MAKEUP, PROP, QUANTITY, WARDROBE, SFX, VFX, SET_DEC,
-                  STUNT, VEHICLE, NOTE, ID, INT_EXT
+                    Allowed categories ONLY:
+                    SCENE_HEADER, TRANSITION, TIME, LOCATION, PROD_LOC,
+                    ACTOR, NON_SPEAKING, AGE, BUILD, ETHNICITY, GENDER,
+                    MAKEUP, PROP, QUANTITY, WARDROBE, SFX, VFX, SET_DEC,
+                    STUNT, VEHICLE, NOTE, ID, INT_EXT
 
-                  RULES:
-                  Scene starts with "Ex: Format Check | Test by Color and RB" where "Test by Color and RB" should always considered as SCENE_HEADER. 
+                    RULES:
 
-                  1. Any full scene line like:
-                    "EXT. - STREET - DAY",
-                    "INT. - HOSPITAL ROOM - NIGHT",
-                    "CUT TO - SCENE 1 - YEARS EARLIER"
-                    MUST be returned as SCENE_HEADER (entire line).
+                    Scene starts with "Ex: Format Check | Test by Color and RB"
+                    → "Test by Color and RB" must always be categorized as SCENE_HEADER.
 
-                  2. Also extract scene parts separately:
-                    INT./EXT. → INT_EXT
-                    Location → LOCATION
-                    Time → TIME
-                    Scene numbers → ID
+                    1. Any full scene line like:
+                      "EXT. - STREET - DAY",
+                      "INT. - HOSPITAL ROOM - NIGHT",
+                      "CUT TO - SCENE 1 - YEARS EARLIER",
+                      "FADE IN - SCENE 1 - DAY"
+                      MUST be returned as SCENE_HEADER (entire line).
 
-                  3. Script starts with "Note:" then the whole paragraph should considered as "NOTE" category
+                    2. For each SCENE_HEADER, also extract its components separately:
+                      - INT./EXT. → INT_EXT
+                      - Location → LOCATION
+                      - Time → TIME
+                      - Scene numbers (e.g. SCENE 1, SCENE 2) → ID
 
-                  4. If text appears inside parentheses "( )",
-                    return the text WITH brackets and categorize correctly.
+                    3. Actor handling (VERY IMPORTANT):
+                      - Character names in CAPS → ACTOR.
+                      - Each ACTOR must appear ONLY ONCE per scene.
+                      - If the same ACTOR appears again within the same scene, DO NOT list it again.
+                      - When a NEW scene starts (new SCENE_HEADER), ACTOR uniqueness resets.
+                      - Unnamed groups (e.g. GIRLS 1–2) → NON_SPEAKING.
 
-                  5. Character names in CAPS → ACTOR.
-                    Unnamed groups (e.g. GIRLS 1-2) → NON_SPEAKING.
+                    4. If text appears inside parentheses "( )":
+                      - Return the text WITH brackets.
+                      - Categorize correctly (AGE, GENDER, ETHNICITY, WARDROBE, PROP, NOTE, etc.).
+                      - Do NOT repeat parenthetical attributes if the ACTOR is not re-listed.
 
-                  6. Camera directions → VFX.
-                    Transitions → TRANSITION.
-                    Sounds → SFX.
+                    5. Script starts with "Note:":
+                      - The entire paragraph must be categorized as NOTE.
 
-                  7. Objects → PROP.
-                    Vehicles → VEHICLE.
-                    Furniture/room items → SET_DEC.
+                    6. Camera directions, physical actions, facial reactions → VFX.
+                      Transitions (CUT TO, FADE OUT, etc.) → TRANSITION.
+                      Sounds (SLAPS, clanks, snorts, etc.) → SFX.
 
-                  8. Preserve order. Do not invent or omit items.
-                  Note: Do not get single character or symbols (Ex: ".", "..." etc.)
-                  always get whole word. Ex: "Hello", "Girl" etc.
+                    7. Objects → PROP.
+                      Vehicles → VEHICLE.
+                      Furniture / room items → SET_DEC.
 
-                  Script:
-                  ${text}
-                  `;
+                    8. Preserve original order exactly.
+                      Do NOT invent or omit items.
+
+                    9. Do NOT extract single characters or symbols.
+                      Always extract complete words or phrases only.
+
+                    10. Dialogue lines must be returned as PROD_LOC.
+
+                    Script:
+                    ${text}
+                    `;
 
   const completion = await generateWithRetry(ai, {
     model: "gemini-3-flash-preview",
