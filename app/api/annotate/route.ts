@@ -31,18 +31,14 @@ export async function POST(req: Request) {
   try {
     const { docId, scriptData } = await req.json();
 
-    const scenes = scriptData?.flat(Infinity);
-
-    console.log("Line 36...", scenes);
-
-    if (!docId || !scenes) {
+    if (!docId || !scriptData) {
       return NextResponse.json(
         { error: "Missing docId or scriptData" },
         { status: 400 },
       );
     }
 
-    const fullItems = scenes.map((item: any) => ({
+    const fullItems = scriptData.map((item: any) => ({
       text: item.text,
       category: item.category,
       bgColor: CATEGORY_COLORS[item.category as keyof typeof CATEGORY_COLORS],

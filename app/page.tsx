@@ -178,15 +178,31 @@ export default function Home() {
     if (savedKey) setApiKey(savedKey);
   }, []);
 
+  function dedupeActorsPerScene(scenes: any): any {
+    return scenes.map((scene: any) => {
+      const seen = new Set<string>();
+
+      return scene.filter((token: any) => {
+        if (token.category !== "ACTOR") return true;
+
+        const name = token.text.trim().toUpperCase();
+        if (seen.has(name)) return false;
+
+        seen.add(name);
+        return true;
+      });
+    });
+  }
+
   const triggerAutoAnnotation = async (docId: string, data: any) => {
-    console.log("Line 183 annotation data", data);
+    const sceneData = dedupeActorsPerScene(data)?.flat(Infinity);
 
     try {
       console.log("Triggering auto-annotation for doc:", docId);
       const res = await fetch("/api/annotate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ docId, scriptData: data }),
+        body: JSON.stringify({ docId, scriptData: sceneData }),
       });
       if (res.ok) {
         console.log("Auto-annotation successful");
