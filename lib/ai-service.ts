@@ -111,24 +111,15 @@ export async function analyzeScript(
                     Scene starts with "Ex: Format Check | Test by Color and RB"
                     → Only "Test by Color and RB" must always be categorized as ID not "Format Check".
 
-                    1. Any full scene line like:
-                      "EXT. - STREET - DAY",
-                      "INT. - HOSPITAL ROOM - NIGHT",
-                      "CUT TO - SCENE 1 - YEARS EARLIER",
-                      "FADE IN - SCENE 1 - DAY"
-                      MUST be returned as SCENE_HEADER (entire line).
+                    1. The word Scene-<number> (e.g. Scene-1, Scene-2, etc) should be considered as SCENE_HEADER 
 
-                    2. For each SCENE_HEADER, also extract its components separately:
+                    2. Also extract the components:
                       - INT./EXT. → INT_EXT
                       - Location → LOCATION
                       - Time → TIME
-                      - Scene numbers (e.g. SCENE 1, SCENE 2) → ID
 
                     3. Actor handling (VERY IMPORTANT):
                       - Character names in CAPS → ACTOR.
-                      - Each ACTOR must appear ONLY ONCE per scene.
-                      - If the same ACTOR appears again within the same scene, DO NOT list it again.
-                      - When a NEW scene starts (new SCENE_HEADER), ACTOR uniqueness resets.
                       - Unnamed groups (e.g. GIRLS 1–2) → NON_SPEAKING.
 
                     4. If text appears inside parentheses "( )":
@@ -148,20 +139,24 @@ export async function analyzeScript(
                       - "John walks into the room" → do NOT extract.
                       - "Explosion destroys the car" → VFX.
 
-                      Transitions (CUT TO, FADE OUT) → TRANSITION.
+                      Transitions (CONTINUOUS, LATER THAT DAY, MOMENTS LATER) → TRANSITION.
+                      The Words before SCENE-<number> like (e.g. FADE IN, CUT TO, FLASH TO) should not be considered as TRANSITION
                       Sounds (SLAPS, bangs, crashes) → SFX.
 
                     7. Objects → PROP.
                       Vehicles → VEHICLE.
                       Furniture / room items → SET_DEC.
+                    
+                    8. The single word (lowercase in the brackets only) in the script which require makeover should be considered as MAKEUP
+                      [e.g. (begger), (homeless), etc] lowercase only
 
-                    8. Preserve original order exactly.
+                    9. Preserve original order exactly.
                       Do NOT invent or omit items.
 
-                    9. Do NOT extract single characters or symbols.
+                    12. Do NOT extract single characters or symbols.
                       Always extract complete words or phrases only.
 
-                    10. Do NOT extract normal narrative action lines.
+                    13. Do NOT extract normal narrative action lines.
                       Extract only items that clearly match allowed categories.
 
                     Script:
