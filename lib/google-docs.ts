@@ -135,7 +135,7 @@ export async function highlightEntities(
     };
 
     /* -------------------------------------------------------------- */
-    /* Apply Highlights                                                */
+    /* Apply Highlights                                                
     /* -------------------------------------------------------------- */
 
     items.forEach(({ text, bgColor }) => {

@@ -109,7 +109,7 @@ export async function analyzeScript(
                     RULES:
 
                     Scene starts with "Ex: Format Check | Test by Color and RB"
-                    → "Test by Color and RB" must always be categorized as SCENE_HEADER.
+                    → Only "Test by Color and RB" must always be categorized as ID not "Format Check".
 
                     1. Any full scene line like:
                       "EXT. - STREET - DAY",
@@ -139,9 +139,17 @@ export async function analyzeScript(
                     5. Script starts with "Note:":
                       - The entire paragraph must be categorized as NOTE.
 
-                    6. Camera directions, physical actions, facial reactions → VFX.
-                      Transitions (CUT TO, FADE OUT, etc.) → TRANSITION.
-                      Sounds (SLAPS, clanks, snorts, etc.) → SFX.
+                    6. VFX must ONLY include real visual effects:
+                      explosions, CGI, fire, smoke, green screen, slow motion, special graphics, etc.
+
+                      Normal character actions or movements must NOT be categorized as VFX.
+
+                      Example:
+                      - "John walks into the room" → do NOT extract.
+                      - "Explosion destroys the car" → VFX.
+
+                      Transitions (CUT TO, FADE OUT) → TRANSITION.
+                      Sounds (SLAPS, bangs, crashes) → SFX.
 
                     7. Objects → PROP.
                       Vehicles → VEHICLE.
@@ -153,7 +161,8 @@ export async function analyzeScript(
                     9. Do NOT extract single characters or symbols.
                       Always extract complete words or phrases only.
 
-                    10. Dialogue lines must be returned as PROD_LOC.
+                    10. Do NOT extract normal narrative action lines.
+                      Extract only items that clearly match allowed categories.
 
                     Script:
                     ${text}
