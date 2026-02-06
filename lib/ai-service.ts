@@ -153,10 +153,10 @@ export async function analyzeScript(
                     9. Preserve original order exactly.
                       Do NOT invent or omit items.
 
-                    12. Do NOT extract single characters or symbols.
+                    10. Do NOT extract single characters or symbols.
                       Always extract complete words or phrases only.
 
-                    13. Do NOT extract normal narrative action lines.
+                    11. Do NOT extract normal narrative action lines.
                       Extract only items that clearly match allowed categories.
 
                     Script:
