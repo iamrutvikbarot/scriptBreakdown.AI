@@ -53,7 +53,7 @@ function hexToRgbColor(hex: string): RgbColor {
 }
 
 /* ------------------------------------------------------------------ */
-/* Highlight Entities in Google Doc                                    */
+/* Highlight Entities in Google Doc                                   */
 /* ------------------------------------------------------------------ */
 
 export async function highlightEntities(
@@ -82,26 +82,41 @@ export async function highlightEntities(
 
     const requests: docs_v1.Schema$Request[] = [];
 
+    // Build a full-text buffer and a map from buffer index -> document index.
+    const fullTextParts: string[] = [];
+    const indexMap: number[] = [];
+
+    textSegments.forEach((seg) => {
+      if (!seg.val) return;
+      fullTextParts.push(seg.val);
+      for (let i = 0; i < seg.val.length; i += 1) {
+        indexMap.push(seg.startIndex + i);
+      }
+    });
+
+    const fullText = fullTextParts.join("");
+
     const addHighlight = (text: string, bgColor: string): void => {
       if (!text || text.length < 2 || !bgColor) return;
 
       const target = text.trim();
+      if (!target) return;
 
-      textSegments.forEach((seg) => {
-        let cursor = 0;
+      let cursor = 0;
 
-        while (true) {
-          const index = seg.val.indexOf(target, cursor);
-          if (index === -1) break;
+      while (true) {
+        const index = fullText.indexOf(target, cursor);
+        if (index === -1) break;
 
-          const absStart = seg.startIndex + index;
-          const absEnd = absStart + target.length;
+        const startDocIndex = indexMap[index];
+        const endDocIndex = indexMap[index + target.length - 1];
 
+        if (startDocIndex !== undefined && endDocIndex !== undefined) {
           requests.push({
             updateTextStyle: {
               range: {
-                startIndex: absStart,
-                endIndex: absEnd,
+                startIndex: startDocIndex,
+                endIndex: endDocIndex + 1,
               },
               textStyle: {
                 backgroundColor: {
@@ -113,14 +128,14 @@ export async function highlightEntities(
               fields: "backgroundColor",
             },
           });
-
-          cursor = index + 1;
         }
-      });
+
+        cursor = index + 1;
+      }
     };
 
     /* -------------------------------------------------------------- */
-    /* Apply Highlights                                                */
+    /* Apply Highlights                                                
     /* -------------------------------------------------------------- */
 
     items.forEach(({ text, bgColor }) => {

@@ -31,22 +31,18 @@ export async function POST(req: Request) {
   try {
     const { docId, scriptData } = await req.json();
 
-    const scenes = scriptData?.flat();
-
-    if (!docId || !scenes) {
+    if (!docId || !scriptData) {
       return NextResponse.json(
         { error: "Missing docId or scriptData" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const fullItems = scenes.map((item: any) => ({
+    const fullItems = scriptData.map((item: any) => ({
       text: item.text,
       category: item.category,
       bgColor: CATEGORY_COLORS[item.category as keyof typeof CATEGORY_COLORS],
     }));
-
-    // console.log("Line 123>>>script final data to be annotate", scriptDatas);
 
     await highlightEntities(docId, fullItems);
 
@@ -55,7 +51,7 @@ export async function POST(req: Request) {
     console.error("Annotation API Error:", error);
     return NextResponse.json(
       { error: "Failed to annotate document", details: error },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
