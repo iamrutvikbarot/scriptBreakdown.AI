@@ -121,7 +121,7 @@ export async function analyzeScript(
                       (e.g. "INT. - PARKING LOT - WITH LIZ AND MAXINE - DAY" where "LOCATION" should be "INT. - PARKING LOT - WITH LIZ AND MAXINE")
 
                     3. Actor handling (VERY IMPORTANT):
-                      - Character names in CAPS → ACTOR.
+                      - Character names → ACTOR.
                       - Unnamed groups (e.g. GIRLS 1–2) → NON_SPEAKING.
 
                     4. If text appears inside parentheses "( )":

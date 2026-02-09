@@ -38,6 +38,7 @@ interface TextSegment {
 export interface HighlightItem {
   text: string;
   bgColor: string;
+  category: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,7 +83,6 @@ export async function highlightEntities(
 
     const requests: docs_v1.Schema$Request[] = [];
 
-    // Build a full-text buffer and a map from buffer index -> document index.
     const fullTextParts: string[] = [];
     const indexMap: number[] = [];
 
@@ -96,7 +96,22 @@ export async function highlightEntities(
 
     const fullText = fullTextParts.join("");
 
-    const addHighlight = (text: string, bgColor: string): void => {
+    /* -------------------------------------------------------------- */
+    /* NEW LOGIC: Track scenes and actors already highlighted         */
+    /* -------------------------------------------------------------- */
+
+    let currentScene = "GLOBAL";
+    const actorHighlightedPerScene: Record<string, Set<string>> = {};
+
+    const isSceneHeader = (text: string): boolean => {
+      return /SCENE\s*\d+/i.test(text);
+    };
+
+    const addHighlight = (
+      text: string,
+      bgColor: string,
+      category?: string,
+    ): void => {
       if (!text || text.length < 2 || !bgColor) return;
 
       const target = text.trim();
@@ -110,6 +125,31 @@ export async function highlightEntities(
 
         const startDocIndex = indexMap[index];
         const endDocIndex = indexMap[index + target.length - 1];
+
+        // ---- SCENE DETECTION ----
+        const precedingText = fullText.substring(0, index);
+
+        const sceneMatches = precedingText.match(/SCENE\s*\d+/gi);
+
+        if (sceneMatches && sceneMatches.length > 0) {
+          currentScene = sceneMatches[sceneMatches.length - 1];
+        } else {
+          currentScene = "GLOBAL";
+        }
+
+        // ---- NEW ACTOR RULE ----
+        if (category === "ACTOR") {
+          if (!actorHighlightedPerScene[currentScene]) {
+            actorHighlightedPerScene[currentScene] = new Set();
+          }
+
+          if (actorHighlightedPerScene[currentScene].has(target)) {
+            cursor = index + 1;
+            continue; // skip duplicate actor in same scene
+          }
+
+          actorHighlightedPerScene[currentScene].add(target);
+        }
 
         if (startDocIndex !== undefined && endDocIndex !== undefined) {
           requests.push({
@@ -135,11 +175,11 @@ export async function highlightEntities(
     };
 
     /* -------------------------------------------------------------- */
-    /* Apply Highlights                                                
+    /* Apply Highlights                                               */
     /* -------------------------------------------------------------- */
 
-    items.forEach(({ text, bgColor }) => {
-      addHighlight(text, bgColor);
+    items.forEach(({ text, bgColor, category }) => {
+      addHighlight(text, bgColor, category);
     });
 
     if (requests.length > 0) {
@@ -155,6 +195,7 @@ export async function highlightEntities(
     throw error;
   }
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Extract Raw Text from Google Doc                                    */
