@@ -114,12 +114,14 @@ export async function analyzeScript(
                     1. The word Scene-<number> (e.g. Scene-1, Scene-2, etc) should be considered as SCENE_HEADER 
 
                     2. Also extract the components:
-                      - INT./EXT. → INT_EXT
                       - Location → LOCATION
                       - Time → TIME
+                    
+                    3. If Line starts with INT/EXT and ends with DAY/NIGHT/AFTERNOON etc so everything from INT/EXT to whole sentence exculede DAY/NIGHT/AFTERNOON should be "LOCATION".
+                      (e.g. "INT. - PARKING LOT - WITH LIZ AND MAXINE - DAY" where "LOCATION" should be "INT. - PARKING LOT - WITH LIZ AND MAXINE")
 
                     3. Actor handling (VERY IMPORTANT):
-                      - Character names in CAPS → ACTOR.
+                      - Character names → ACTOR.
                       - Unnamed groups (e.g. GIRLS 1–2) → NON_SPEAKING.
 
                     4. If text appears inside parentheses "( )":

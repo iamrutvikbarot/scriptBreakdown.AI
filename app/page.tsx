@@ -1036,11 +1036,14 @@ export default function Home() {
             CREATED BY
           </p>
           <div className="relative group cursor-default">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 via-teal-400 to-emerald-600 rounded-lg blur opacity-20 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-text-gradient bg-[length:200%_auto]"></div>
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-60  0 via-teal-400 to-emerald-600 rounded-lg blur opacity-20 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 animate-text-gradient bg-[length:200%_auto]"></div>
             <span className="relative text-lg sm:text-xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-200 to-emerald-500 animate-text-gradient bg-[length:200%_auto]">
               RUTVIK BAROT
             </span>
           </div>
+        </div>
+        <div className="flex flex-col items-end justify-center gap-2 pr-4 ">
+          <p className="relative text-[12px] sm:text-[12px] font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-200 to-emerald-500 animate-text-gradient bg-[length:200%_auto]">{process.env.APP_VERSION}</p>
         </div>
       </footer>
 
