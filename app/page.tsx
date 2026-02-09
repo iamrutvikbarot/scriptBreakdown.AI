@@ -1041,6 +1041,7 @@ export default function Home() {
               RUTVIK BAROT
             </span>
           </div>
+          <p className="text-left text-[12px]">{process.env.APP_VERSION}</p>
         </div>
       </footer>
 
