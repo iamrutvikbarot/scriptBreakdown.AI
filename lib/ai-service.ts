@@ -90,6 +90,7 @@ export function parseLLMJson(data: string) {
 export async function analyzeScript(
   text: string,
   apiKey?: string,
+  model: string = "gemini-3-flash-preview",
 ): Promise<ScriptData> {
   const ai = new GoogleGenAI({
     apiKey: apiKey || process.env.GEMINI_API_KEY!,
@@ -165,8 +166,9 @@ export async function analyzeScript(
                     ${text}
                     `;
 
+
   const completion = await generateWithRetry(ai, {
-    model: "gemini-3-flash-preview",
+    model: model,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
 

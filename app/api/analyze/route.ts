@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { fileUrl, apiKey } = await req.json();
+    const { fileUrl, apiKey, model } = await req.json();
 
     if (!fileUrl) {
       return NextResponse.json(
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
               message: `Analyzing chunk ${i + 1}/${scenes.length}`,
             });
 
-            const analysis = await analyzeScript(text, apiKey);
+            const analysis = await analyzeScript(text, apiKey, model);
 
             sendEvent("chunk", {
               chunkIndex: i,

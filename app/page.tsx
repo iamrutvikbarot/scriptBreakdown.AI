@@ -158,15 +158,20 @@ Happy producing!
 Best regards,
 The ScriptBreakdown.AI Team`;
 
-export default function Home() {
+  export default function Home() {
   const { showToast } = useToast();
   const [result, setResult] = useState<ScriptData | null>(null);
   const [loading, setLoading] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [provider, setProvider] = useState("nvidia");
-
   const [docUrl, setDocUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gemini-3-flash-preview");
+
+  const MODELS = [
+    { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite", value: "gemini-2.5-flash-lite" },
+    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
+    { id: "gemini-3-flash", name: "Gemini 3.0 Flash (Default)", value: "gemini-3-flash-preview" },
+    { id: "gemini-3-pro", name: "Gemini 3.0 Pro", value: "gemini-3-pro-preview" },
+  ];
 
   // Progress State
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -228,6 +233,7 @@ export default function Home() {
       stream: true,
       fileUrl: docUrl,
       apiKey: apiKey || undefined,
+      model: selectedModel,
     };
 
     const finalResults: Annotation[][] = [];
@@ -387,7 +393,11 @@ export default function Home() {
   };
 
   const transformResults = (results: Annotation[][]): ProcessedScene[] => {
-    return results.map((sceneTokens, index) => {
+    return results
+      .filter((sceneTokens) =>
+        sceneTokens.some((token) => token.category === "SCENE_HEADER"),
+      )
+      .map((sceneTokens, index) => {
       const scene: ProcessedScene = {
         scene_number: index + 1,
         int_ext: "",
@@ -580,7 +590,7 @@ export default function Home() {
           {/* Main Input Panel */}
           <div className="glass-panel rounded-2xl md:rounded-3xl p-2 md:p-3 shadow-2xl shadow-black/50 mx-2 md:mx-0">
             <div className="bg-black/40 rounded-xl md:rounded-2xl p-4 md:p-8 space-y-4 md:space-y-6 border border-white/5">
-              <div className="h-48 md:h-64 flex flex-col justify-center items-center gap-4 md:gap-6">
+              <div className="flex flex-col justify-center items-center gap-4 md:gap-6 py-6 transition-all duration-300">
                 <div className="w-full max-w-lg space-y-3 px-2">
                   <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">
                     Google Doc URL
@@ -651,11 +661,33 @@ export default function Home() {
                     server key.
                   </p>
                 </div>
+
+                {/* Model Selection */}
+                <div className="w-full max-w-lg space-y-3 px-2">
+                  <label className="text-xs md:text-sm font-bold text-gray-400 ml-1 uppercase tracking-wider">
+                    Select Model
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODELS.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => setSelectedModel(model.value)}
+                        className={`text-left px-3 py-2 rounded-xl text-xs font-mono transition-all border ${
+                          selectedModel === model.value
+                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                            : "bg-black/20 border-white/5 text-gray-400 hover:bg-white/5"
+                        }`}
+                      >
+                        {model.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-white/5 gap-4">
                 <div className="text-[10px] md:text-xs text-gray-600 font-mono order-2 md:order-1 capitalize">
-                  AI MODEL: gemini-3-flash-preview
+                  AI MODEL: {selectedModel}
                 </div>
                 {loading ? (
                   <div className="w-full md:w-auto flex-1 md:max-w-md mx-auto order-1 md:order-2 space-y-2">
