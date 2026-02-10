@@ -90,6 +90,7 @@ export function parseLLMJson(data: string) {
 export async function analyzeScript(
   text: string,
   apiKey?: string,
+  model: string = "gemini-3-flash-preview",
 ): Promise<ScriptData> {
   const ai = new GoogleGenAI({
     apiKey: apiKey || process.env.GEMINI_API_KEY!,
@@ -111,28 +112,29 @@ export async function analyzeScript(
                     Scene starts with "Ex: Format Check | Test by Color and RB"
                     → Only "Test by Color and RB" must always be categorized as ID not "Format Check".
 
-                    1. The word Scene-<number> (e.g. Scene-1, Scene-2, etc) should be considered as SCENE_HEADER 
+                    1. The word Scene-<number> (e.g. Scene-1, Scene-2, etc) should be considered as "SCENE_HEADER"
+                    2. The whole line at the right side of "Scene-<number>" should be considered as "TRANSITION" 
 
-                    2. Also extract the components:
+                    3. Also extract the components:
                       - Location → LOCATION
                       - Time → TIME
                     
-                    3. If Line starts with INT/EXT and ends with DAY/NIGHT/AFTERNOON etc so everything from INT/EXT to whole sentence exculede DAY/NIGHT/AFTERNOON should be "LOCATION".
+                    4. If Line starts with INT/EXT and ends with DAY/NIGHT/AFTERNOON etc so everything from INT/EXT to whole sentence exculede DAY/NIGHT/AFTERNOON should be "LOCATION".
                       (e.g. "INT. - PARKING LOT - WITH LIZ AND MAXINE - DAY" where "LOCATION" should be "INT. - PARKING LOT - WITH LIZ AND MAXINE")
 
-                    3. Actor handling (VERY IMPORTANT):
+                    5. Actor handling (VERY IMPORTANT):
                       - Character names → ACTOR.
                       - Unnamed groups (e.g. GIRLS 1–2) → NON_SPEAKING.
 
-                    4. If text appears inside parentheses "( )":
+                    6. If text appears inside parentheses "( )":
                       - Return the text WITH brackets.
                       - Categorize correctly (AGE, GENDER, ETHNICITY, WARDROBE, PROP, NOTE, etc.).
                       - Do NOT repeat parenthetical attributes if the ACTOR is not re-listed.
 
-                    5. Script starts with "Note:":
+                    7. Script starts with "Note:":
                       - The entire paragraph must be categorized as NOTE.
 
-                    6. VFX must ONLY include real visual effects:
+                    8. VFX must ONLY include real visual effects:
                       explosions, CGI, fire, smoke, green screen, slow motion, special graphics, etc.
 
                       Normal character actions or movements must NOT be categorized as VFX.
@@ -145,28 +147,29 @@ export async function analyzeScript(
                       The Words before SCENE-<number> like (e.g. FADE IN, CUT TO, FLASH TO) should not be considered as TRANSITION
                       Sounds (SLAPS, bangs, crashes) → SFX.
 
-                    7. Objects → PROP.
+                    9. Objects → PROP.
                       Vehicles → VEHICLE.
                       Furniture / room items → SET_DEC.
                     
-                    8. The single word (lowercase in the brackets only) in the script which require makeover should be considered as MAKEUP
+                    10. The single word (lowercase in the brackets only) in the script which require makeover should be considered as MAKEUP
                       [e.g. (begger), (homeless), etc] lowercase only
 
-                    9. Preserve original order exactly.
+                    11. Preserve original order exactly.
                       Do NOT invent or omit items.
 
-                    10. Do NOT extract single characters or symbols.
+                    12. Do NOT extract single characters or symbols.
                       Always extract complete words or phrases only.
 
-                    11. Do NOT extract normal narrative action lines.
+                    13. Do NOT extract normal narrative action lines.
                       Extract only items that clearly match allowed categories.
 
                     Script:
                     ${text}
                     `;
 
+
   const completion = await generateWithRetry(ai, {
-    model: "gemini-3-flash-preview",
+    model: model,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
   });
 
