@@ -18,7 +18,7 @@ export function splitScriptIntoScenes(fullText: string): string[] {
 
   const scenes: string[] = [];
 
-  // ✅ Add preamble/heading part (before SCENE 1)
+  // Add preamble/heading part (before SCENE 1)
   const firstSceneStartIndex = matches[0].index!;
   const preamble = text.slice(0, firstSceneStartIndex).trim();
 
@@ -26,7 +26,7 @@ export function splitScriptIntoScenes(fullText: string): string[] {
     scenes.push(preamble);
   }
 
-  // ✅ Add all scenes (each including its SCENE marker line)
+  // Add all scenes (each including its SCENE marker line)
   for (let i = 0; i < matches.length; i++) {
     const currentMatch = matches[i];
     const nextMatch = matches[i + 1];
